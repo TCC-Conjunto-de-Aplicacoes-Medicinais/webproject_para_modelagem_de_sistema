@@ -1,0 +1,71 @@
+# ========================
+# Front-end (Next.js)
+# ========================
+
+# dependencies
+front-end/node_modules
+front-end/.pnp
+front-end/.pnp.*
+front-end/.yarn/*
+!front-end/.yarn/patches
+!front-end/.yarn/plugins
+!front-end/.yarn/releases
+!front-end/.yarn/versions
+
+# testing
+front-end/coverage
+
+# next.js
+front-end/.next/
+front-end/out/
+
+# production
+front-end/build
+
+# typescript
+front-end/*.tsbuildinfo
+front-end/next-env.d.ts
+
+# ========================
+# Back-end (Go)
+# ========================
+
+# Binários compilados
+back-end/bin/
+back-end/*.exe
+back-end/*.exe~
+back-end/*.dll
+back-end/*.so
+back-end/*.dylib
+
+# Arquivos de teste
+back-end/*.test
+
+# Output do go build
+back-end/tmp/
+
+# ========================
+# Geral
+# ========================
+
+# misc
+.DS_Store
+*.pem
+
+# debug
+npm-debug.log*
+yarn-debug.log*
+yarn-error.log*
+.pnpm-debug.log*
+
+# env files (can opt-in for committing if needed)
+.env*
+
+# vercel
+.vercel
+
+# IDEs
+.idea/
+.vscode/
+*.swp
+*.swo
