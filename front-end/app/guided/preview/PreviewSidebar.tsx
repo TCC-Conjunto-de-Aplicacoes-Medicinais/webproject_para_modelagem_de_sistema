@@ -67,8 +67,8 @@ export default function PreviewSidebar({ activeScreen, onSelectScreen, activeRol
     if (assistant.features.patientManagement) {
       items.push({ id: 'patient-mgmt', icon: <PersonAddIcon sx={{ fontSize: 12 }} />, label: 'Pacientes' });
     }
-    if (assistant.features.basicFinancial) {
-      items.push({ id: 'financial', icon: <AttachMoneyIcon sx={{ fontSize: 12 }} />, label: 'Financeiro' });
+    if (assistant.features.billing) {
+      items.push({ id: 'financial', icon: <AttachMoneyIcon sx={{ fontSize: 12 }} />, label: 'Faturamento' });
     }
     if (assistant.features.checkInOut) {
       items.push({ id: 'checkin', icon: <HowToRegIcon sx={{ fontSize: 12 }} />, label: 'Check-In' });
@@ -86,8 +86,8 @@ export default function PreviewSidebar({ activeScreen, onSelectScreen, activeRol
     if (management.features.staffRegistration) {
       items.push({ id: 'staff', icon: <BadgeIcon sx={{ fontSize: 12 }} />, label: 'Equipe' });
     }
-    if (management.features.advancedFinancial) {
-      items.push({ id: 'financial', icon: <AttachMoneyIcon sx={{ fontSize: 12 }} />, label: 'Financeiro' });
+    if (management.features.billingControl) {
+      items.push({ id: 'financial', icon: <AttachMoneyIcon sx={{ fontSize: 12 }} />, label: 'Faturamento' });
     }
     if (management.features.dashboards) {
       items.push({ id: 'reports', icon: <BarChartIcon sx={{ fontSize: 12 }} />, label: 'Relatórios' });

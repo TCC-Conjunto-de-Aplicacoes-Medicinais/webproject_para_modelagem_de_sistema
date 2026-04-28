@@ -12,6 +12,7 @@ import Radio from '@mui/material/Radio';
 import Collapse from '@mui/material/Collapse';
 import Divider from '@mui/material/Divider';
 import Tooltip from '@mui/material/Tooltip';
+import Alert from '@mui/material/Alert';
 import InfoOutlinedIcon from '@mui/icons-material/InfoOutlined';
 import { useTheme } from '@mui/material/styles';
 import MedicalServicesIcon from '@mui/icons-material/MedicalServices';
@@ -50,22 +51,28 @@ const PATIENT_RECORD_SUBFEATURES: FeatureItem[] = [
   { key: 'aiEcg', label: 'Análise de IA (ECG)', description: 'Análise inteligente de eletrocardiogramas por IA' },
   { key: 'prescriptions', label: 'Prescrições e Laudos', description: 'Emita laudos, receitas e solicitações de exames' },
   { key: 'prescriptionTemplate', label: 'Template de Prescrição', description: 'Upload de modelo base da clínica para preenchimento' },
+  { key: 'digitalSignature', label: 'Receita com Assinatura Digital', description: 'Emita receitas com assinatura digital válida juridicamente' },
+  { key: 'stampedPrescription', label: 'Receita Carimbada (Impressão)', description: 'Receita para remédios controlados e farmácia popular — permite impressão' },
+  { key: 'medicationControl', label: 'Controle de Remédios', description: 'Gerencie e acompanhe os remédios em uso pelo paciente' },
 ];
 
 const ASSISTANT_FEATURES: FeatureItem[] = [
   { key: 'scheduling', label: 'Agendamento', description: 'Agende consultas para os pacientes' },
   { key: 'doctorScheduleView', label: 'Agenda dos Médicos', description: 'Consulte a disponibilidade dos médicos' },
   { key: 'patientManagement', label: 'Gestão de Pacientes', description: 'Cadastro e atualização de dados dos pacientes' },
-  { key: 'basicFinancial', label: 'Financeiro Básico', description: 'Controle básico de pagamentos e recebimentos' },
+  { key: 'billing', label: 'Faturamento', description: 'Controle de faturamento por convênio — discrimine o que cada convênio deve ao final do mês' },
   { key: 'insurancePlans', label: 'Convênios', description: 'Gerenciamento dos convênios aceitos pela clínica' },
   { key: 'checkInOut', label: 'Check-In / Check-Out', description: 'Controle de chegada e saída dos pacientes' },
+  { key: 'billingCheckControl', label: 'Controle de Check (Faturamento)', description: 'Marque os atendimentos como faturados — controle visual do que já foi processado por convênio' },
 ];
 
 const MANAGEMENT_FEATURES: FeatureItem[] = [
   { key: 'doctorSchedules', label: 'Agenda dos Médicos', description: 'Visão geral das agendas de todos os médicos' },
   { key: 'attendanceControl', label: 'Controle de Presença', description: 'Acompanhe a presença e pontualidade dos médicos' },
   { key: 'staffRegistration', label: 'Cadastro de Equipe', description: 'Gerencie médicos e assistentes da clínica' },
-  { key: 'advancedFinancial', label: 'Financeiro Avançado', description: 'Relatórios financeiros detalhados e projeções' },
+  { key: 'billingControl', label: 'Controle de Faturamento', description: 'Faturamento geral da clínica' },
+  { key: 'billingByDoctor', label: 'Faturamento por Médico', description: 'Discrimine o faturamento por médico da equipe — veja quanto cada profissional contribui' },
+  { key: 'systemCost', label: 'Custo do Sistema', description: 'Exiba o custo mensal do sistema na tela gerencial' },
   { key: 'dashboards', label: 'Dashboards e Relatórios', description: 'Painéis analíticos com métricas da clínica' },
 ];
 
@@ -371,6 +378,23 @@ export default function StepModules() {
                           accentColor={accentColor}
                         />
                       ))}
+
+                      {/* Informativo sobre receita carimbada */}
+                      {doctor.features.patientRecord.stampedPrescription && (
+                        <Alert
+                          severity="info"
+                          sx={{
+                            mt: 1,
+                            ml: 3,
+                            '& .MuiAlert-message': { fontSize: '0.8rem' },
+                          }}
+                        >
+                          Em alguns casos, a receita online não é aceita para medicamentos controlados
+                          ou na farmácia popular. Esta opção permite gerar uma receita formatada para
+                          impressão, que o médico pode preencher digitalmente ou à mão e carimbar
+                          pessoalmente.
+                        </Alert>
+                      )}
                     </Box>
                   </Collapse>
                 )}

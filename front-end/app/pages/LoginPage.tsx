@@ -17,7 +17,9 @@ import LockIcon from '@mui/icons-material/Lock';
 import Visibility from '@mui/icons-material/Visibility';
 import VisibilityOff from '@mui/icons-material/VisibilityOff';
 import AutoAwesomeIcon from '@mui/icons-material/AutoAwesome';
+import CircularProgress from '@mui/material/CircularProgress';
 import { useNavigation } from '@/app/contexts/NavigationContext';
+import { useAuth } from '@/app/contexts/AuthContext';
 import { PageRoute, type LoginCredentials } from '@/app/types';
 
 const INITIAL_CREDENTIALS: LoginCredentials = {
@@ -27,11 +29,14 @@ const INITIAL_CREDENTIALS: LoginCredentials = {
 
 export default function LoginPage() {
   const { navigateTo } = useNavigation();
+  const { login } = useAuth();
   const theme = useTheme();
   const isDark = theme.palette.mode === 'dark';
   const [credentials, setCredentials] = useState<LoginCredentials>(INITIAL_CREDENTIALS);
   const [showPassword, setShowPassword] = useState(false);
   const [errors, setErrors] = useState<Partial<LoginCredentials>>({});
+  const [isSubmitting, setIsSubmitting] = useState(false);
+  const [globalError, setGlobalError] = useState('');
 
   const validateForm = (): boolean => {
     const newErrors: Partial<LoginCredentials> = {};
@@ -52,16 +57,27 @@ export default function LoginPage() {
     return Object.keys(newErrors).length === 0;
   };
 
-  const handleSubmit = (event: FormEvent<HTMLFormElement>) => {
+  const handleSubmit = async (event: FormEvent<HTMLFormElement>) => {
     event.preventDefault();
+    setGlobalError('');
 
     if (!validateForm()) {
       return;
     }
 
-    // TODO: integrar com backend real
-    console.log('Login mock:', credentials);
-    navigateTo(PageRoute.SYSTEM_CREATION);
+    try {
+      setIsSubmitting(true);
+      await login(credentials);
+      navigateTo(PageRoute.SYSTEM_CREATION);
+    } catch (err: any) {
+      let msg = err.message || 'Erro ao realizar login. Verifique suas credenciais.';
+      if (msg.includes('invalid credentials') || msg.includes('record not found')) {
+        msg = 'E-mail ou senha incorretos.';
+      }
+      setGlobalError(msg);
+    } finally {
+      setIsSubmitting(false);
+    }
   };
 
   const handleChange = (field: keyof LoginCredentials) => (
@@ -121,6 +137,24 @@ export default function LoginPage() {
               Entre na sua conta para continuar
             </Typography>
           </Box>
+
+          {globalError && (
+            <Box
+              sx={{
+                mb: 3,
+                p: 1.5,
+                borderRadius: 2,
+                backgroundColor: 'rgba(244, 67, 54, 0.1)',
+                border: '1px solid',
+                borderColor: 'error.main',
+                textAlign: 'center',
+              }}
+            >
+              <Typography variant="body2" color="error">
+                {globalError}
+              </Typography>
+            </Box>
+          )}
 
           {/* Form */}
           <Box component="form" onSubmit={handleSubmit} noValidate>
@@ -197,9 +231,10 @@ export default function LoginPage() {
               color="primary"
               fullWidth
               size="large"
+              disabled={isSubmitting}
               sx={{ py: 1.5, fontSize: '1rem', mb: 3 }}
             >
-              Entrar
+              {isSubmitting ? <CircularProgress size={24} color="inherit" /> : 'Entrar'}
             </Button>
 
             <Divider sx={{ mb: 3 }}>

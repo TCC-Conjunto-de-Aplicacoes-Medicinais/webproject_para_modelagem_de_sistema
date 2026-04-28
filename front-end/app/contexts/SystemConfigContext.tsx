@@ -10,6 +10,8 @@ import {
   type ReactNode,
 } from 'react';
 import { v4 as uuidv4 } from 'uuid';
+import { api } from '@/app/services/api';
+import { useAuth } from '@/app/contexts/AuthContext';
 import type {
   SystemBlueprint,
   IdentityConfig,
@@ -43,6 +45,9 @@ const DEFAULT_MODULES: ModulesConfig = {
         aiEcg: false,
         prescriptions: true,
         prescriptionTemplate: false,
+        digitalSignature: true,
+        stampedPrescription: true,
+        medicationControl: true,
       },
       consultationHistory: true,
       schedule: true,
@@ -55,9 +60,10 @@ const DEFAULT_MODULES: ModulesConfig = {
       scheduling: true,
       doctorScheduleView: true,
       patientManagement: true,
-      basicFinancial: true,
+      billing: true,
       insurancePlans: true,
       checkInOut: true,
+      billingCheckControl: true,
     },
   },
   management: {
@@ -66,7 +72,9 @@ const DEFAULT_MODULES: ModulesConfig = {
       doctorSchedules: true,
       attendanceControl: true,
       staffRegistration: true,
-      advancedFinancial: true,
+      billingControl: true,
+      billingByDoctor: true,
+      systemCost: true,
       dashboards: true,
     },
   },
@@ -81,7 +89,8 @@ const DEFAULT_TECHNICAL: TechnicalConfig = {
   hasDisasterRecovery: false,
   drSecondaryEnv: null,
   sizing: {
-    avgPatients: 100,
+    minPatients: 50,
+    maxPatients: 150,
     avgDoctors: 3,
     avgAssistants: 2,
   },
@@ -97,23 +106,39 @@ const DEFAULT_IMPLEMENTATION: ImplementationConfig = {
   address: '',
 };
 
-// ─── LocalStorage helpers ───────────────────────────────
+// ─── Api helpers ───────────────────────────────
 
-const PROJECTS_STORAGE_KEY = 'clinicagen_projects';
-
-function loadProjects(): SystemBlueprint[] {
-  if (typeof window === 'undefined') return [];
+async function loadProjectsFromApi(token: string): Promise<SystemBlueprint[]> {
   try {
-    const raw = localStorage.getItem(PROJECTS_STORAGE_KEY);
-    return raw ? JSON.parse(raw) : [];
-  } catch {
+    const data = await api.listProjects(token);
+    // Para simplificar, a API atualmente retorna chaves de string (prefixos).
+    // Num cenário ideal, a API retornaria os JSONs completos.
+    // Como a API atual só lista nomes de objetos, podemos ignorar a extração detalhada
+    // se não houver um endpoint que retorne o conteúdo do arquivo.
+    // MAS, vamos deixar este stub pronto.
+    return data.projects || [];
+  } catch (err) {
+    console.error('Falha ao carregar projetos da API', err);
     return [];
   }
 }
 
-function saveProjectsToStorage(projects: SystemBlueprint[]) {
-  if (typeof window === 'undefined') return;
-  localStorage.setItem(PROJECTS_STORAGE_KEY, JSON.stringify(projects));
+async function saveProjectToApi(token: string, project: SystemBlueprint) {
+  try {
+    await api.createProject(token, project);
+  } catch (err) {
+    console.error('Falha ao salvar projeto na API', err);
+    throw err;
+  }
+}
+
+async function deleteProjectFromApi(token: string, id: string) {
+  try {
+    await api.deleteProject(token, id);
+  } catch (err) {
+    console.error('Falha ao deletar projeto da API', err);
+    throw err;
+  }
 }
 
 // ─── State & Actions ────────────────────────────────────
@@ -178,13 +203,11 @@ function systemConfigReducer(
 
     case 'SAVE_PROJECT': {
       const newProjects = [...state.projects, action.project];
-      saveProjectsToStorage(newProjects);
       return { ...state, projects: newProjects };
     }
 
     case 'DELETE_PROJECT': {
       const filtered = state.projects.filter((p) => p.id !== action.id);
-      saveProjectsToStorage(filtered);
       return { ...state, projects: filtered };
     }
 
@@ -239,8 +262,8 @@ interface SystemConfigContextType {
   updateImplementation: (payload: Partial<ImplementationConfig>) => void;
   reset: () => void;
   generateBlueprint: () => SystemBlueprint;
-  saveProject: () => SystemBlueprint;
-  deleteProject: (id: string) => void;
+  saveProject: () => Promise<SystemBlueprint>;
+  deleteProject: (id: string) => Promise<void>;
   goNext: () => void;
   goBack: () => void;
   canGoNext: boolean;
@@ -259,14 +282,21 @@ interface SystemConfigProviderProps {
 
 export function SystemConfigProvider({ children }: SystemConfigProviderProps) {
   const [state, dispatch] = useReducer(systemConfigReducer, INITIAL_STATE);
+  const { token, isAuthenticated } = useAuth();
 
-  // Load projects from localStorage on mount
+  // Load projects from API on mount
   useEffect(() => {
-    const projects = loadProjects();
-    if (projects.length > 0) {
-      dispatch({ type: 'LOAD_PROJECTS', projects });
+    if (isAuthenticated && token) {
+      loadProjectsFromApi(token).then((projects) => {
+        // Atualmente o back-end retorna só a lista de strings. Se estivéssemos retornando o objeto completo, populariamos o estado
+        if (projects && projects.length > 0) {
+          dispatch({ type: 'LOAD_PROJECTS', projects });
+        }
+      });
+    } else {
+      dispatch({ type: 'LOAD_PROJECTS', projects: [] });
     }
-  }, []);
+  }, [isAuthenticated, token]);
 
   const setStep = useCallback(
     (step: GuidedStep) => dispatch({ type: 'SET_STEP', step }),
@@ -311,15 +341,19 @@ export function SystemConfigProvider({ children }: SystemConfigProviderProps) {
     };
   }, [state]);
 
-  const saveProject = useCallback((): SystemBlueprint => {
+  const saveProject = useCallback(async (): Promise<SystemBlueprint> => {
+    if (!token) throw new Error('Não autorizado');
     const blueprint = generateBlueprint();
+    await saveProjectToApi(token, blueprint);
     dispatch({ type: 'SAVE_PROJECT', project: blueprint });
     return blueprint;
-  }, [generateBlueprint]);
+  }, [generateBlueprint, token]);
 
-  const deleteProject = useCallback((id: string) => {
+  const deleteProject = useCallback(async (id: string) => {
+    if (!token) return;
+    await deleteProjectFromApi(token, id);
     dispatch({ type: 'DELETE_PROJECT', id });
-  }, []);
+  }, [token]);
 
   const goNext = useCallback(() => {
     if (state.currentStep < 3) {

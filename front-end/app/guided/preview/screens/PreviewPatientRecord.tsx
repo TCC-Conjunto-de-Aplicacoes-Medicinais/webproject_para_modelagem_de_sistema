@@ -133,6 +133,55 @@ export default function PreviewPatientRecord({ onBack }: PreviewPatientRecordPro
             </Box>
           )}
 
+          {/* Medication Control */}
+          {patientRecord.medicationControl && (
+            <Box sx={{ p: 0.7, borderRadius: 1, backgroundColor: cardBg, border: `1px solid ${cardBorder}` }}>
+              <Box sx={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', mb: 0.4 }}>
+                <Typography sx={sectionTitle} style={{ marginBottom: 0 }}>💊 Remédios em Uso</Typography>
+                <Box sx={{ px: 0.4, py: 0.1, borderRadius: 0.5, backgroundColor: `${colors.accent}15`, cursor: 'default' }}>
+                  <Typography sx={{ fontSize: '0.3rem', fontWeight: 600, color: colors.accent }}>+ Adicionar</Typography>
+                </Box>
+              </Box>
+              <Box sx={{ display: 'flex', flexDirection: 'column', gap: 0.25 }}>
+                {[
+                  { name: 'Losartana 50mg', freq: '1x/dia', since: 'Jan/2026' },
+                  { name: 'Atenolol 25mg', freq: '2x/dia', since: 'Mar/2025' },
+                  { name: 'AAS 100mg', freq: '1x/dia', since: 'Out/2024' },
+                ].map((med) => (
+                  <Box
+                    key={med.name}
+                    sx={{
+                      display: 'flex',
+                      alignItems: 'center',
+                      justifyContent: 'space-between',
+                      p: 0.3,
+                      borderRadius: 0.5,
+                      backgroundColor: isDark ? '#1E40AF10' : '#EFF6FF',
+                      border: '1px solid',
+                      borderColor: isDark ? '#1E40AF25' : '#DBEAFE',
+                    }}
+                  >
+                    <Box sx={{ display: 'flex', alignItems: 'center', gap: 0.3 }}>
+                      <Typography sx={{ fontSize: '0.35rem', fontWeight: 600, color: isDark ? '#93C5FD' : '#2563EB' }}>
+                        {med.name}
+                      </Typography>
+                    </Box>
+                    <Box sx={{ display: 'flex', gap: 0.3 }}>
+                      <Box sx={{ px: 0.4, py: 0.1, borderRadius: 0.5, backgroundColor: `${colors.accent}15` }}>
+                        <Typography sx={{ fontSize: '0.25rem', fontWeight: 600, color: colors.accent }}>
+                          {med.freq}
+                        </Typography>
+                      </Box>
+                      <Typography sx={{ fontSize: '0.25rem', color: isDark ? '#64748B' : '#9CA3AF' }}>
+                        desde {med.since}
+                      </Typography>
+                    </Box>
+                  </Box>
+                ))}
+              </Box>
+            </Box>
+          )}
+
           {/* Consultation History */}
           <Box sx={{ p: 0.7, borderRadius: 1, backgroundColor: cardBg, border: `1px solid ${cardBorder}` }}>
             <Typography sx={sectionTitle}>🕐 Últimas Consultas</Typography>
@@ -316,9 +365,9 @@ export default function PreviewPatientRecord({ onBack }: PreviewPatientRecordPro
               </Box>
 
               {[
-                { type: 'Laudo Cardiológico', date: '10/04', status: 'Emitido' },
-                { type: 'Solicitação de Exame', date: '10/04', status: 'Pendente' },
-                { type: 'Receituário', date: '15/03', status: 'Emitido' },
+                { type: 'Laudo Cardiológico', date: '10/04', status: 'Emitido', controlled: false },
+                { type: 'Solicitação de Exame', date: '10/04', status: 'Pendente', controlled: false },
+                { type: 'Receituário', date: '15/03', status: 'Emitido', controlled: true },
               ].map((doc, i) => (
                 <Box
                   key={doc.type + doc.date}
@@ -331,29 +380,45 @@ export default function PreviewPatientRecord({ onBack }: PreviewPatientRecordPro
                   }}
                 >
                   <Box>
-                    <Typography sx={{ fontSize: '0.36rem', fontWeight: 500, color: isDark ? '#E2E8F0' : '#1A2E1F' }}>
-                      {doc.type}
-                    </Typography>
+                    <Box sx={{ display: 'flex', alignItems: 'center', gap: 0.3 }}>
+                      <Typography sx={{ fontSize: '0.36rem', fontWeight: 500, color: isDark ? '#E2E8F0' : '#1A2E1F' }}>
+                        {doc.type}
+                      </Typography>
+                      {patientRecord.digitalSignature && doc.status === 'Emitido' && (
+                        <Box sx={{ px: 0.3, py: 0.05, borderRadius: 0.3, backgroundColor: '#7C3AED15', display: 'flex', alignItems: 'center', gap: 0.15 }}>
+                          <Typography sx={{ fontSize: '0.22rem' }}>🔐</Typography>
+                          <Typography sx={{ fontSize: '0.22rem', fontWeight: 600, color: '#7C3AED' }}>Assinado</Typography>
+                        </Box>
+                      )}
+                    </Box>
                     <Typography sx={{ fontSize: '0.28rem', color: isDark ? '#64748B' : '#9CA3AF' }}>
                       {doc.date}
                     </Typography>
                   </Box>
-                  <Typography
-                    sx={{
-                      fontSize: '0.3rem',
-                      fontWeight: 600,
-                      px: 0.4,
-                      py: 0.1,
-                      borderRadius: 0.5,
-                      backgroundColor:
-                        doc.status === 'Emitido'
-                          ? `${colors.accent}15`
-                          : '#F59E0B15',
-                      color: doc.status === 'Emitido' ? colors.accent : '#F59E0B',
-                    }}
-                  >
-                    {doc.status}
-                  </Typography>
+                  <Box sx={{ display: 'flex', alignItems: 'center', gap: 0.3 }}>
+                    {patientRecord.stampedPrescription && doc.controlled && (
+                      <Box sx={{ px: 0.3, py: 0.1, borderRadius: 0.3, backgroundColor: isDark ? '#F5920B15' : '#FEF3C7', cursor: 'default', display: 'flex', alignItems: 'center', gap: 0.15 }}>
+                        <Typography sx={{ fontSize: '0.22rem' }}>🖨️</Typography>
+                        <Typography sx={{ fontSize: '0.22rem', fontWeight: 600, color: '#D97706' }}>Imprimir</Typography>
+                      </Box>
+                    )}
+                    <Typography
+                      sx={{
+                        fontSize: '0.3rem',
+                        fontWeight: 600,
+                        px: 0.4,
+                        py: 0.1,
+                        borderRadius: 0.5,
+                        backgroundColor:
+                          doc.status === 'Emitido'
+                            ? `${colors.accent}15`
+                            : '#F59E0B15',
+                        color: doc.status === 'Emitido' ? colors.accent : '#F59E0B',
+                      }}
+                    >
+                      {doc.status}
+                    </Typography>
+                  </Box>
                 </Box>
               ))}
 

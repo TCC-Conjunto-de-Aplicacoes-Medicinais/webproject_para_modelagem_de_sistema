@@ -10,6 +10,7 @@ import Dialog from '@mui/material/Dialog';
 import Fade from '@mui/material/Fade';
 import Grow from '@mui/material/Grow';
 import LinearProgress from '@mui/material/LinearProgress';
+import CircularProgress from '@mui/material/CircularProgress';
 import CheckCircleIcon from '@mui/icons-material/CheckCircle';
 import RocketLaunchIcon from '@mui/icons-material/RocketLaunch';
 import AssignmentTurnedInIcon from '@mui/icons-material/AssignmentTurnedIn';
@@ -258,6 +259,8 @@ export default function StepFinalization({ onComplete }: StepFinalizationProps) 
   const accentColor = '#00C853';
 
   const [showSuccess, setShowSuccess] = useState(false);
+  const [isSaving, setIsSaving] = useState(false);
+  const [saveError, setSaveError] = useState('');
 
   const activeModules: string[] = [];
   if (modules.doctor.enabled) activeModules.push('Médico');
@@ -279,24 +282,35 @@ export default function StepFinalization({ onComplete }: StepFinalizationProps) 
       if (f.scheduling) count++;
       if (f.doctorScheduleView) count++;
       if (f.patientManagement) count++;
-      if (f.basicFinancial) count++;
+      if (f.billing) count++;
       if (f.insurancePlans) count++;
       if (f.checkInOut) count++;
+      if (f.billingCheckControl) count++;
     }
     if (modules.management.enabled) {
       const f = modules.management.features;
       if (f.doctorSchedules) count++;
       if (f.attendanceControl) count++;
       if (f.staffRegistration) count++;
-      if (f.advancedFinancial) count++;
+      if (f.billingControl) count++;
+      if (f.billingByDoctor) count++;
+      if (f.systemCost) count++;
       if (f.dashboards) count++;
     }
     return count;
   })();
 
-  const handleFinalize = () => {
-    saveProject();
-    setShowSuccess(true);
+  const handleFinalize = async () => {
+    setIsSaving(true);
+    setSaveError('');
+    try {
+      await saveProject();
+      setShowSuccess(true);
+    } catch (err: any) {
+      setSaveError(err.message || 'Erro ao gerar o sistema. Verifique a conexão.');
+    } finally {
+      setIsSaving(false);
+    }
   };
 
   return (
@@ -362,7 +376,7 @@ export default function StepFinalization({ onComplete }: StepFinalizationProps) 
           <SummaryRow label="Acesso" value={getDeploymentLabel(technical.deploymentType)} isDark={isDark} />
           <SummaryRow label="Ambiente" value={getEnvLabel(technical.environment)} isDark={isDark} />
           <SummaryRow label="Alta disponibilidade" value={technical.hasDisasterRecovery ? `Sim (${getEnvLabel(technical.drSecondaryEnv || '')})` : 'Não'} isDark={isDark} />
-          <SummaryRow label="Pacientes" value={String(technical.sizing.avgPatients)} isDark={isDark} />
+          <SummaryRow label="Pacientes" value={`${technical.sizing.minPatients} — ${technical.sizing.maxPatients} (expectativa)`} isDark={isDark} />
           <SummaryRow label="Médicos" value={String(technical.sizing.avgDoctors)} isDark={isDark} />
           <SummaryRow label="Assistentes" value={String(technical.sizing.avgAssistants)} isDark={isDark} />
         </SummaryCard>
@@ -402,7 +416,7 @@ export default function StepFinalization({ onComplete }: StepFinalizationProps) 
           }}
         >
           <Box sx={{ flex: 1, textAlign: 'center' }}>
-            <Typography variant="caption" sx={{ color: 'text.secondary' }}>Mensal</Typography>
+            <Typography variant="caption" sx={{ color: 'text.secondary' }}>Mensal (Inicial)</Typography>
             <Typography sx={{ fontSize: '1.5rem', fontWeight: 800, color: accentColor, lineHeight: 1.2 }}>
               R$ {technical.estimatedPrice.monthly.toLocaleString('pt-BR')}
             </Typography>
@@ -421,13 +435,19 @@ export default function StepFinalization({ onComplete }: StepFinalizationProps) 
 
       {/* Finalize Button */}
       <Box sx={{ textAlign: 'center' }}>
+        {saveError && (
+          <Typography variant="body2" color="error" sx={{ mb: 2 }}>
+            {saveError}
+          </Typography>
+        )}
         <Button
           id="finalize-system"
           variant="contained"
           color="secondary"
           size="large"
           onClick={handleFinalize}
-          startIcon={<RocketLaunchIcon />}
+          disabled={isSaving}
+          startIcon={!isSaving ? <RocketLaunchIcon /> : undefined}
           sx={{
             px: 5,
             py: 1.5,
@@ -441,7 +461,7 @@ export default function StepFinalization({ onComplete }: StepFinalizationProps) 
             },
           }}
         >
-          Finalizar e Gerar Sistema
+          {isSaving ? <CircularProgress size={24} color="inherit" /> : 'Finalizar e Gerar Sistema'}
         </Button>
         <Typography variant="body2" sx={{ color: 'text.secondary', mt: 1.5, fontSize: '0.82rem' }}>
           Ao finalizar, o sistema será gerado e você receberá as instruções por email.

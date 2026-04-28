@@ -34,6 +34,7 @@ import CheckCircleIcon from '@mui/icons-material/CheckCircle';
 import CancelIcon from '@mui/icons-material/Cancel';
 import SearchIcon from '@mui/icons-material/Search';
 import { useNavigation } from '@/app/contexts/NavigationContext';
+import { useAuth } from '@/app/contexts/AuthContext';
 import { PageRoute, type RegisterData, type AddressData } from '@/app/types';
 
 // ─── Constants ──────────────────────────────────────────
@@ -106,6 +107,7 @@ async function fetchCepData(cep: string): Promise<Partial<AddressData> | null> {
 
 export default function RegisterPage() {
   const { navigateTo } = useNavigation();
+  const { register } = useAuth();
   const theme = useTheme();
   const isDark = theme.palette.mode === 'dark';
   const [activeStep, setActiveStep] = useState(0);
@@ -114,6 +116,8 @@ export default function RegisterPage() {
   const [showConfirmPassword, setShowConfirmPassword] = useState(false);
   const [errors, setErrors] = useState<FieldErrors>({});
   const [cepLoading, setCepLoading] = useState(false);
+  const [isSubmitting, setIsSubmitting] = useState(false);
+  const [globalError, setGlobalError] = useState('');
 
   // Password rules status (real-time)
   const passwordStatus = useMemo(
@@ -183,17 +187,37 @@ export default function RegisterPage() {
     setActiveStep((prev) => prev - 1);
   };
 
-  const handleSubmit = (event: FormEvent<HTMLFormElement>) => {
+  const handleSubmit = async (event: FormEvent<HTMLFormElement>) => {
     event.preventDefault();
+    setGlobalError('');
     const stepErrors = getStepErrors(activeStep);
     if (Object.keys(stepErrors).length > 0) {
       setErrors(stepErrors);
       return;
     }
 
-    // TODO: integrar com backend real
-    console.log('Cadastro mock:', formData);
-    navigateTo(PageRoute.LOGIN);
+    try {
+      setIsSubmitting(true);
+      // O formato esperado pela API no backend
+      const payload = {
+        nome_responsavel: formData.name,
+        email: formData.email,
+        senha: formData.password,
+        nome_clinica: formData.clinic.clinicName,
+        cnpj: formData.clinic.cnpj,
+        especialidade: formData.clinic.specialty,
+        telefone: formData.clinic.phone,
+        localizacao: `${formData.clinic.address.street}, ${formData.clinic.address.number} - ${formData.clinic.address.city}/${formData.clinic.address.state}`
+      };
+
+      await register(payload);
+      // Mostrar mensagem de sucesso ou redirecionar para login direto
+      navigateTo(PageRoute.LOGIN);
+    } catch (err: any) {
+      setGlobalError(err.message || 'Erro ao realizar o cadastro.');
+    } finally {
+      setIsSubmitting(false);
+    }
   };
 
   const handlePersonalChange =
@@ -670,6 +694,24 @@ export default function RegisterPage() {
             </Typography>
           </Box>
 
+          {globalError && (
+            <Box
+              sx={{
+                mb: 3,
+                p: 1.5,
+                borderRadius: 2,
+                backgroundColor: 'rgba(244, 67, 54, 0.1)',
+                border: '1px solid',
+                borderColor: 'error.main',
+                textAlign: 'center',
+              }}
+            >
+              <Typography variant="body2" color="error">
+                {globalError}
+              </Typography>
+            </Box>
+          )}
+
           {/* Stepper */}
           <Stepper
             activeStep={activeStep}
@@ -730,9 +772,10 @@ export default function RegisterPage() {
                   variant="contained"
                   color="primary"
                   size="large"
+                  disabled={isSubmitting}
                   sx={{ px: 4, py: 1.2 }}
                 >
-                  Cadastrar
+                  {isSubmitting ? <CircularProgress size={24} color="inherit" /> : 'Cadastrar'}
                 </Button>
               )}
             </Box>

@@ -3,6 +3,10 @@
 import { useState, useEffect } from 'react';
 import Box from '@mui/material/Box';
 import Typography from '@mui/material/Typography';
+import Dialog from '@mui/material/Dialog';
+import IconButton from '@mui/material/IconButton';
+import CloseIcon from '@mui/icons-material/Close';
+import FullscreenIcon from '@mui/icons-material/Fullscreen';
 import { useTheme } from '@mui/material/styles';
 import { useSystemConfig } from '@/app/contexts/SystemConfigContext';
 import { PALETTE_OPTIONS } from '@/app/guided/constants';
@@ -40,6 +44,7 @@ export default function SystemPreview() {
   const colors = PALETTE_OPTIONS[state.identity.palette].colors;
   const [activeScreen, setActiveScreen] = useState<PreviewScreen>('dashboard');
   const [activeRole, setActiveRole] = useState<PreviewRole>('doctor');
+  const [fullscreen, setFullscreen] = useState(false);
 
   // Reset screen when role changes
   useEffect(() => {
@@ -63,7 +68,7 @@ export default function SystemPreview() {
         return <PreviewSchedule />;
       case 'financial':
       case 'reports':
-        return <PreviewFinancial />;
+        return <PreviewFinancial activeRole={activeRole} />;
       case 'settings':
         return <PreviewSettings />;
       case 'patient-mgmt':
@@ -87,6 +92,7 @@ export default function SystemPreview() {
   ];
 
   return (
+    <>
     <Box
       sx={{
         width: '100%',
@@ -149,6 +155,26 @@ export default function SystemPreview() {
               </Typography>
             </Box>
           ))}
+        <Box sx={{ ml: 'auto' }}>
+          <Box
+            onClick={() => setFullscreen(true)}
+            sx={{
+              px: 0.5,
+              py: 0.15,
+              borderRadius: 0.5,
+              cursor: 'pointer',
+              display: 'flex',
+              alignItems: 'center',
+              gap: 0.2,
+              backgroundColor: `${colors.accent}12`,
+              transition: 'all 0.15s ease',
+              '&:hover': { backgroundColor: `${colors.accent}25` },
+            }}
+          >
+            <FullscreenIcon sx={{ fontSize: 10, color: colors.accent }} />
+            <Typography sx={{ fontSize: '0.3rem', fontWeight: 600, color: colors.accent }}>Tela Cheia</Typography>
+          </Box>
+        </Box>
       </Box>
 
       <Box sx={{ display: 'flex', flex: 1 }}>
@@ -168,5 +194,123 @@ export default function SystemPreview() {
         </Box>
       </Box>
     </Box>
+
+      {/* ─── Fullscreen Dialog ─── */}
+      <Dialog
+        open={fullscreen}
+        onClose={() => setFullscreen(false)}
+        fullScreen
+        PaperProps={{
+          sx: {
+            backgroundColor: isDark ? '#0F172A' : '#f5f7f6',
+          },
+        }}
+      >
+        {/* Close button */}
+        <IconButton
+          onClick={() => setFullscreen(false)}
+          sx={{
+            position: 'absolute',
+            top: 12,
+            right: 12,
+            zIndex: 10,
+            backgroundColor: isDark ? '#1E293B' : '#ffffff',
+            boxShadow: '0 2px 8px rgba(0,0,0,0.15)',
+            '&:hover': { backgroundColor: isDark ? '#334155' : '#f0f0f0' },
+          }}
+        >
+          <CloseIcon sx={{ fontSize: 20 }} />
+        </IconButton>
+
+        {/* Full preview content at real scale */}
+        <Box sx={{ display: 'flex', flexDirection: 'column', height: '100vh', fontSize: '0.9rem' }}>
+          <PreviewNavbar />
+
+          {/* Role Switcher (fullscreen version) */}
+          <Box
+            sx={{
+              display: 'flex',
+              alignItems: 'center',
+              gap: 1,
+              px: 2,
+              py: 1,
+              borderBottom: '1px solid',
+              borderColor: isDark ? '#1E293B' : '#e8ece9',
+              backgroundColor: isDark ? '#0F172A' : '#ffffff',
+            }}
+          >
+            <Typography sx={{ fontSize: '0.85rem', color: isDark ? '#64748B' : '#9CA3AF', mr: 0.5 }}>
+              Visão:
+            </Typography>
+            {availableRoles
+              .filter((r) => r.enabled)
+              .map((r) => (
+                <Box
+                  key={r.role}
+                  onClick={() => setActiveRole(r.role)}
+                  sx={{
+                    px: 1.5,
+                    py: 0.5,
+                    borderRadius: 1,
+                    cursor: 'pointer',
+                    backgroundColor: activeRole === r.role ? `${colors.accent}18` : 'transparent',
+                    border: '1px solid',
+                    borderColor: activeRole === r.role ? `${colors.accent}40` : 'transparent',
+                    transition: 'all 0.15s ease',
+                    '&:hover': {
+                      backgroundColor: activeRole === r.role
+                        ? `${colors.accent}18`
+                        : (isDark ? '#1E293B' : '#f0f2f1'),
+                    },
+                  }}
+                >
+                  <Typography
+                    sx={{
+                      fontSize: '0.85rem',
+                      fontWeight: activeRole === r.role ? 600 : 400,
+                      color: activeRole === r.role ? colors.accent : (isDark ? '#94A3B8' : '#6B7280'),
+                    }}
+                  >
+                    {r.label}
+                  </Typography>
+                </Box>
+              ))}
+          </Box>
+
+          <Box sx={{ display: 'flex', flex: 1, overflow: 'hidden' }}>
+            {/* Full-size sidebar */}
+            <Box
+              sx={{
+                width: 200,
+                flexShrink: 0,
+                backgroundColor: isDark ? '#0F172A' : '#ffffff',
+                borderRight: '1px solid',
+                borderColor: isDark ? '#1E293B' : '#e8ece9',
+                py: 2,
+                display: 'flex',
+                flexDirection: 'column',
+                gap: 0.5,
+                overflow: 'auto',
+              }}
+            >
+              <PreviewSidebar
+                activeScreen={activeScreen}
+                onSelectScreen={setActiveScreen}
+                activeRole={activeRole}
+              />
+            </Box>
+            <Box
+              sx={{
+                flex: 1,
+                p: 3,
+                overflow: 'auto',
+              }}
+            >
+              {renderScreen()}
+            </Box>
+          </Box>
+        </Box>
+      </Dialog>
+    </>
   );
 }

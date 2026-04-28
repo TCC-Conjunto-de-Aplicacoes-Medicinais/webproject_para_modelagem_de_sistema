@@ -187,20 +187,26 @@ export default function StepTechnical() {
       if (f.scheduling) count++;
       if (f.doctorScheduleView) count++;
       if (f.patientManagement) count++;
-      if (f.basicFinancial) count++;
+      if (f.billing) count++;
       if (f.insurancePlans) count++;
       if (f.checkInOut) count++;
+      if (f.billingCheckControl) count++;
     }
     if (modules.management.enabled) {
       const f = modules.management.features;
       if (f.doctorSchedules) count++;
       if (f.attendanceControl) count++;
       if (f.staffRegistration) count++;
-      if (f.advancedFinancial) count++;
+      if (f.billingControl) count++;
+      if (f.billingByDoctor) count++;
+      if (f.systemCost) count++;
       if (f.dashboards) count++;
     }
     return count;
   }, [modules]);
+
+  // Average patients for pricing
+  const avgPatients = Math.ceil((technical.sizing.minPatients + technical.sizing.maxPatients) / 2);
 
   // Calculate price
   const price = useMemo(
@@ -209,11 +215,11 @@ export default function StepTechnical() {
         technical.deploymentType,
         technical.environment,
         technical.hasDisasterRecovery,
-        technical.sizing.avgPatients,
+        avgPatients,
         technical.sizing.avgDoctors,
         moduleCount,
       ),
-    [technical, moduleCount],
+    [technical, moduleCount, avgPatients],
   );
 
   // Update price in state
@@ -486,26 +492,51 @@ export default function StepTechnical() {
           </Typography>
         </Box>
         <Typography variant="body2" sx={{ color: 'text.secondary', mb: 3 }}>
-          Informe a média mensal da sua clínica para dimensionarmos a infraestrutura
-          adequada. Isso pode ser ajustado futuramente.
+          Informe a expectativa de volume da sua clínica para dimensionarmos a infraestrutura
+          adequada. São estimativas e podem ser ajustadas futuramente.
         </Typography>
 
         <Box sx={{ display: 'flex', flexDirection: 'column', gap: 3.5 }}>
-          {/* Patients */}
+          {/* Patients — Range */}
           <Box>
-            <Box sx={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', mb: 1 }}>
-              <Typography variant="body2" sx={{ fontWeight: 500 }}>Pacientes ativos (média mensal)</Typography>
+            <Typography variant="body2" sx={{ fontWeight: 500, mb: 0.5 }}>Pacientes esperados (expectativa mensal)</Typography>
+            <Typography variant="caption" sx={{ color: 'text.secondary', display: 'block', mb: 1.5 }}>
+              Informe o mínimo e o máximo de pacientes que espera atender mensalmente. É uma expectativa — pode ser ajustado futuramente.
+            </Typography>
+            <Box sx={{ display: 'flex', gap: 2, alignItems: 'center', mb: 1 }}>
               <TextField
-                value={technical.sizing.avgPatients}
+                label="Mínimo"
+                value={technical.sizing.minPatients}
                 onChange={(e) => {
                   const v = parseInt(e.target.value, 10);
-                  if (!isNaN(v) && v >= 0) updateTechnical({ sizing: { ...technical.sizing, avgPatients: v } });
+                  if (!isNaN(v) && v >= 0) updateTechnical({ sizing: { ...technical.sizing, minPatients: Math.min(v, technical.sizing.maxPatients) } });
                 }}
                 type="number"
                 size="small"
                 inputProps={{ min: 0, style: { textAlign: 'center', fontWeight: 700 } }}
                 sx={{
-                  width: 100,
+                  flex: 1,
+                  '& .MuiOutlinedInput-root': {
+                    '& fieldset': { borderColor: `${accentColor}40` },
+                    '&:hover fieldset': { borderColor: accentColor },
+                    '&.Mui-focused fieldset': { borderColor: accentColor },
+                  },
+                  '& input': { color: accentColor, py: 0.5 },
+                }}
+              />
+              <Typography variant="body2" sx={{ color: 'text.secondary', fontWeight: 500 }}>a</Typography>
+              <TextField
+                label="Máximo"
+                value={technical.sizing.maxPatients}
+                onChange={(e) => {
+                  const v = parseInt(e.target.value, 10);
+                  if (!isNaN(v) && v >= 0) updateTechnical({ sizing: { ...technical.sizing, maxPatients: Math.max(v, technical.sizing.minPatients) } });
+                }}
+                type="number"
+                size="small"
+                inputProps={{ min: 0, style: { textAlign: 'center', fontWeight: 700 } }}
+                sx={{
+                  flex: 1,
                   '& .MuiOutlinedInput-root': {
                     '& fieldset': { borderColor: `${accentColor}40` },
                     '&:hover fieldset': { borderColor: accentColor },
@@ -517,10 +548,11 @@ export default function StepTechnical() {
             </Box>
             <Slider
               id="sizing-patients"
-              value={Math.min(technical.sizing.avgPatients, 2000)}
-              onChange={(_, v) =>
-                updateTechnical({ sizing: { ...technical.sizing, avgPatients: v as number } })
-              }
+              value={[Math.min(technical.sizing.minPatients, 2000), Math.min(technical.sizing.maxPatients, 2000)]}
+              onChange={(_, v) => {
+                const [min, max] = v as number[];
+                updateTechnical({ sizing: { ...technical.sizing, minPatients: min, maxPatients: max } });
+              }}
               min={10}
               max={2000}
               step={10}
@@ -533,6 +565,9 @@ export default function StepTechnical() {
               <Typography variant="caption" sx={{ color: 'text.disabled' }}>10</Typography>
               <Typography variant="caption" sx={{ color: 'text.disabled' }}>2.000+</Typography>
             </Box>
+            <Typography variant="caption" sx={{ color: 'text.secondary', mt: 0.5, display: 'block', textAlign: 'center' }}>
+              Estimativa de valor baseada em ~{avgPatients} pacientes (média do range)
+            </Typography>
           </Box>
 
           {/* Doctors */}
@@ -632,11 +667,11 @@ export default function StepTechnical() {
       {/* ═══════════════════════════════════════════════ */}
       <Box>
         <Typography variant="h5" sx={{ mb: 0.5, color: 'text.primary' }}>
-          Estimativa de Preço
+          Preço Inicial (Estimativa)
         </Typography>
         <Typography variant="body2" sx={{ color: 'text.secondary', mb: 3 }}>
-          Valores estimados com base nas suas escolhas. O preço final será confirmado na
-          etapa de implementação.
+          Este é o preço inicial estimado com base nas suas escolhas. O valor final será
+          confirmado após análise completa do projeto e pode variar conforme a demanda real.
         </Typography>
 
         <Box sx={{ display: 'flex', gap: 2, mb: 3 }}>
@@ -655,7 +690,7 @@ export default function StepTechnical() {
             }}
           >
             <Typography variant="body2" sx={{ color: 'text.secondary', mb: 0.5 }}>
-              Mensal
+              Mensal (Inicial)
             </Typography>
             <Typography
               sx={{
@@ -722,7 +757,7 @@ export default function StepTechnical() {
           {[
             { label: 'Plano base', value: price.base, desc: technical.deploymentType === 'web' ? 'Site' : 'Desktop' },
             { label: `Módulos (${moduleCount} ativos)`, value: price.modules, desc: `${moduleCount} × R$ 49` },
-            { label: 'Dimensionamento', value: price.sizing, desc: `${technical.sizing.avgPatients} pac. / ${technical.sizing.avgDoctors} méd.` },
+            { label: 'Dimensionamento', value: price.sizing, desc: `~${avgPatients} pac. / ${technical.sizing.avgDoctors} méd.` },
             ...(price.environment > 0 ? [{ label: 'Ambiente cloud', value: price.environment, desc: technical.environment === 'aws' ? 'AWS' : 'Azure' }] : []),
             ...(price.dr > 0 ? [{ label: 'Alta disponibilidade', value: price.dr, desc: 'Terraform + DR' }] : []),
           ].map((item, i) => (
@@ -769,9 +804,10 @@ export default function StepTechnical() {
           </Box>
         </Box>
 
-        <Alert severity="info" sx={{ mt: 2, '& .MuiAlert-message': { fontSize: '0.82rem' } }}>
-          Os valores são estimativas para referência. O preço final será definido após a
-          análise completa do projeto.
+        <Alert severity="warning" sx={{ mt: 2, '& .MuiAlert-message': { fontSize: '0.82rem' } }}>
+          <Typography variant="body2" sx={{ fontWeight: 600, mb: 0.5 }}>Preço Inicial</Typography>
+          Este é o preço inicial estimado. O valor final será confirmado após análise completa
+          do projeto e pode variar conforme a demanda real.
         </Alert>
       </Box>
 

@@ -76,6 +76,9 @@ export interface DoctorPatientRecordFeatures {
   aiEcg: boolean;
   prescriptions: boolean;
   prescriptionTemplate: boolean;
+  digitalSignature: boolean;
+  stampedPrescription: boolean;
+  medicationControl: boolean;
 }
 
 export interface DoctorFeatures {
@@ -95,9 +98,10 @@ export interface AssistantFeatures {
   scheduling: boolean;
   doctorScheduleView: boolean;
   patientManagement: boolean;
-  basicFinancial: boolean;
+  billing: boolean;
   insurancePlans: boolean;
   checkInOut: boolean;
+  billingCheckControl: boolean;
 }
 
 export interface AssistantModule {
@@ -110,7 +114,9 @@ export interface ManagementFeatures {
   doctorSchedules: boolean;
   attendanceControl: boolean;
   staffRegistration: boolean;
-  advancedFinancial: boolean;
+  billingControl: boolean;
+  billingByDoctor: boolean;
+  systemCost: boolean;
   dashboards: boolean;
 }
 
@@ -131,7 +137,8 @@ export interface ModulesConfig {
 }
 
 export interface SizingConfig {
-  avgPatients: number;
+  minPatients: number;
+  maxPatients: number;
   avgDoctors: number;
   avgAssistants: number;
 }

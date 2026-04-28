@@ -14,6 +14,12 @@ import Tooltip from '@mui/material/Tooltip';
 import Divider from '@mui/material/Divider';
 import Fade from '@mui/material/Fade';
 import Grid from '@mui/material/Grid';
+import Dialog from '@mui/material/Dialog';
+import DialogTitle from '@mui/material/DialogTitle';
+import DialogContent from '@mui/material/DialogContent';
+import DialogActions from '@mui/material/DialogActions';
+import TextField from '@mui/material/TextField';
+import CircularProgress from '@mui/material/CircularProgress';
 import { useTheme } from '@mui/material/styles';
 import AutoFixHighIcon from '@mui/icons-material/AutoFixHigh';
 import CheckCircleOutlineIcon from '@mui/icons-material/CheckCircleOutline';
@@ -24,6 +30,9 @@ import PaletteIcon from '@mui/icons-material/Palette';
 import ExtensionIcon from '@mui/icons-material/Extension';
 import CalendarTodayIcon from '@mui/icons-material/CalendarToday';
 import { SystemConfigProvider, useSystemConfig } from '@/app/contexts/SystemConfigContext';
+import { useAuth } from '@/app/contexts/AuthContext';
+import { useNavigation } from '@/app/contexts/NavigationContext';
+import { PageRoute } from '@/app/types';
 import GuidedWizard from '@/app/guided/GuidedWizard';
 import type { SystemBlueprint } from '@/app/types';
 
@@ -34,6 +43,11 @@ function ProjectList({ onCreateNew }: { onCreateNew: () => void }) {
   const theme = useTheme();
   const isDark = theme.palette.mode === 'dark';
   const accentColor = '#00C853';
+
+  // ─── Delete confirmation state ────
+  const [deleteDialog, setDeleteDialog] = useState<{ open: boolean; id: string; name: string }>({ open: false, id: '', name: '' });
+  const [deletePassword, setDeletePassword] = useState('');
+  const [deleteError, setDeleteError] = useState('');
 
   function getPaletteLabel(palette: string): string {
     const map: Record<string, string> = { green: 'Verde', blue: 'Azul', red: 'Vermelho' };
@@ -127,7 +141,7 @@ function ProjectList({ onCreateNew }: { onCreateNew: () => void }) {
 
                 <Tooltip title="Excluir projeto">
                   <IconButton
-                    onClick={() => deleteProject(project.id)}
+                    onClick={() => setDeleteDialog({ open: true, id: project.id, name: project.identity.clinicName || 'Sistema sem nome' })}
                     size="small"
                     sx={{
                       color: 'text.secondary',
@@ -155,6 +169,65 @@ function ProjectList({ onCreateNew }: { onCreateNew: () => void }) {
       >
         Criar novo sistema
       </Button>
+
+      {/* ─── Delete Confirmation Dialog ─── */}
+      <Dialog
+        open={deleteDialog.open}
+        onClose={() => { setDeleteDialog({ open: false, id: '', name: '' }); setDeletePassword(''); setDeleteError(''); }}
+        maxWidth="xs"
+        fullWidth
+        PaperProps={{ sx: { borderRadius: 3 } }}
+      >
+        <DialogTitle sx={{ fontWeight: 700, color: 'text.primary' }}>
+          Confirmar exclusão
+        </DialogTitle>
+        <DialogContent>
+          <Typography variant="body2" sx={{ color: 'text.secondary', mb: 2 }}>
+            Para excluir o projeto <strong>&ldquo;{deleteDialog.name}&rdquo;</strong>, confirme digitando sua senha.
+          </Typography>
+          <TextField
+            fullWidth
+            type="password"
+            label="Senha"
+            value={deletePassword}
+            onChange={(e) => { setDeletePassword(e.target.value); setDeleteError(''); }}
+            error={!!deleteError}
+            helperText={deleteError}
+            autoFocus
+            size="small"
+            sx={{
+              '& .MuiOutlinedInput-root': {
+                '&.Mui-focused fieldset': { borderColor: 'error.main' },
+              },
+            }}
+          />
+        </DialogContent>
+        <DialogActions sx={{ px: 3, pb: 2 }}>
+          <Button
+            onClick={() => { setDeleteDialog({ open: false, id: '', name: '' }); setDeletePassword(''); setDeleteError(''); }}
+            sx={{ color: 'text.secondary' }}
+          >
+            Cancelar
+          </Button>
+          <Button
+            variant="contained"
+            color="error"
+            onClick={() => {
+              if (!deletePassword.trim()) {
+                setDeleteError('Digite sua senha para confirmar');
+                return;
+              }
+              deleteProject(deleteDialog.id);
+              setDeleteDialog({ open: false, id: '', name: '' });
+              setDeletePassword('');
+              setDeleteError('');
+            }}
+            sx={{ fontWeight: 600 }}
+          >
+            Excluir
+          </Button>
+        </DialogActions>
+      </Dialog>
     </Box>
   );
 }
@@ -163,11 +236,28 @@ function ProjectList({ onCreateNew }: { onCreateNew: () => void }) {
 
 function SystemCreationContent() {
   const { state } = useSystemConfig();
+  const { isAuthenticated, isLoading } = useAuth();
+  const { navigateTo } = useNavigation();
   const [showWizard, setShowWizard] = useState(false);
   const theme = useTheme();
   const isDark = theme.palette.mode === 'dark';
 
   const hasProjects = state.projects.length > 0;
+
+  if (isLoading) {
+    return <Box sx={{ display: 'flex', justifyContent: 'center', py: 10 }}><CircularProgress color="secondary" /></Box>;
+  }
+
+  if (!isAuthenticated) {
+    return (
+      <Box sx={{ textAlign: 'center', py: 10 }}>
+        <Typography variant="h5" sx={{ mb: 2 }}>Você precisa estar logado para acessar esta página.</Typography>
+        <Button variant="contained" color="secondary" onClick={() => navigateTo(PageRoute.LOGIN)}>
+          Fazer Login
+        </Button>
+      </Box>
+    );
+  }
 
   // Show wizard
   if (showWizard) {
