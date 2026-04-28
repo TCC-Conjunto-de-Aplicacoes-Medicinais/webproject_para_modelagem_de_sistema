@@ -259,6 +259,18 @@ function SystemCreationContent() {
     );
   }
 
+  const { isVerified } = useAuth();
+  if (isAuthenticated && !isVerified) {
+    return (
+      <Box sx={{ textAlign: 'center', py: 10 }}>
+        <Typography variant="h5" sx={{ mb: 2 }}>Sua conta ainda não foi verificada.</Typography>
+        <Button variant="contained" color="secondary" onClick={() => navigateTo(PageRoute.VERIFY)}>
+          Verificar Conta
+        </Button>
+      </Box>
+    );
+  }
+
   // Show wizard
   if (showWizard) {
     return (

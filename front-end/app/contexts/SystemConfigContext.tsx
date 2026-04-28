@@ -116,7 +116,8 @@ async function loadProjectsFromApi(token: string): Promise<SystemBlueprint[]> {
     // Como a API atual só lista nomes de objetos, podemos ignorar a extração detalhada
     // se não houver um endpoint que retorne o conteúdo do arquivo.
     // MAS, vamos deixar este stub pronto.
-    return data.projects || [];
+    // Filtra possíveis objetos malformados
+    return (data.projects || []).filter((p: any) => p && p.identity);
   } catch (err) {
     console.error('Falha ao carregar projetos da API', err);
     return [];

@@ -18,7 +18,7 @@ func NewClinicRepository(db *gorm.DB) ports.ClinicRepository {
 }
 
 func (r *clinicRepository) Save(ctx context.Context, clinic *domain.Clinic) error {
-	return r.db.WithContext(ctx).Create(clinic).Error
+	return r.db.WithContext(ctx).Save(clinic).Error
 }
 
 func (r *clinicRepository) FindByEmail(ctx context.Context, email string) (*domain.Clinic, error) {

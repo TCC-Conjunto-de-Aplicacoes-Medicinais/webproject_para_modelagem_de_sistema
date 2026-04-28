@@ -4,6 +4,7 @@ export enum PageRoute {
   LANDING = 'landing',
   LOGIN = 'login',
   REGISTER = 'register',
+  VERIFY = 'verify',
   SYSTEM_CREATION = 'system-creation',
 }
 

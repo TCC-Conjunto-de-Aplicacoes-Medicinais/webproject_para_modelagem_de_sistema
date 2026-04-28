@@ -69,9 +69,33 @@ func (h *AuthHandler) Login(c *gin.Context) {
 
 	token, err := h.authService.Login(c.Request.Context(), req.Email, req.Senha)
 	if err != nil {
+		if err.Error() == "unverified_account" {
+			c.JSON(http.StatusForbidden, gin.H{"error": "unverified_account", "token": token})
+			return
+		}
 		c.JSON(http.StatusUnauthorized, gin.H{"error": err.Error()})
 		return
 	}
 
 	c.JSON(http.StatusOK, gin.H{"token": token})
+}
+
+type VerifyRequest struct {
+	Email string `json:"email" binding:"required,email"`
+	Code  string `json:"code" binding:"required,len=6"`
+}
+
+func (h *AuthHandler) Verify(c *gin.Context) {
+	var req VerifyRequest
+	if err := c.ShouldBindJSON(&req); err != nil {
+		c.JSON(http.StatusBadRequest, gin.H{"error": err.Error()})
+		return
+	}
+
+	if err := h.authService.VerifyCode(c.Request.Context(), req.Email, req.Code); err != nil {
+		c.JSON(http.StatusBadRequest, gin.H{"error": err.Error()})
+		return
+	}
+
+	c.JSON(http.StatusOK, gin.H{"message": "Conta verificada com sucesso!"})
 }

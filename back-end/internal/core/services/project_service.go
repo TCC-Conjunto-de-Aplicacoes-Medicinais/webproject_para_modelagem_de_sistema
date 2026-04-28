@@ -69,8 +69,26 @@ func (s *ProjectService) CreateProject(ctx context.Context, tenantID string, inp
 	return projectID, nil
 }
 
-func (s *ProjectService) ListProjects(ctx context.Context, tenantID string) ([]string, error) {
-	return s.storageService.ListObjects(ctx, tenantID)
+func (s *ProjectService) ListProjects(ctx context.Context, tenantID string) ([]interface{}, error) {
+	keys, err := s.storageService.ListObjects(ctx, tenantID)
+	if err != nil {
+		return nil, err
+	}
+
+	var projects []interface{}
+	for _, key := range keys {
+		data, err := s.storageService.DownloadJSON(ctx, key)
+		if err != nil {
+			// Skip or log error, but keep listing others
+			continue
+		}
+		var parsed interface{}
+		if err := json.Unmarshal(data, &parsed); err == nil {
+			projects = append(projects, parsed)
+		}
+	}
+
+	return projects, nil
 }
 
 func (s *ProjectService) DeleteProject(ctx context.Context, tenantID, projectID string) error {

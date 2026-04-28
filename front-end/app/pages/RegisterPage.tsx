@@ -211,8 +211,8 @@ export default function RegisterPage() {
       };
 
       await register(payload);
-      // Mostrar mensagem de sucesso ou redirecionar para login direto
-      navigateTo(PageRoute.LOGIN);
+      // Mostrar mensagem de sucesso ou redirecionar para verificação
+      navigateTo(PageRoute.VERIFY);
     } catch (err: any) {
       setGlobalError(err.message || 'Erro ao realizar o cadastro.');
     } finally {

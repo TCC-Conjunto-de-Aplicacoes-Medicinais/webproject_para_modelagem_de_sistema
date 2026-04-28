@@ -17,8 +17,10 @@ type Clinic struct {
 	Localizacao     string         `gorm:"column:location;type:varchar(255)" json:"localizacao"`
 	Especialidade   string         `gorm:"column:specialty;type:varchar(100)" json:"especialidade"`
 	Telefone        string         `gorm:"column:phone;type:varchar(20)" json:"telefone"`
-	BucketObj       string         `gorm:"column:bucket_obj;type:varchar(255)" json:"bucket_obj"`
-	CreatedAt       time.Time      `json:"created_at"`
+	BucketObj        string         `gorm:"column:bucket_obj;type:varchar(255)" json:"bucket_obj"`
+	Verify           bool           `gorm:"column:verify;default:0" json:"verify"`
+	VerificationCode string         `gorm:"column:verification_code;type:varchar(10)" json:"-"`
+	CreatedAt        time.Time      `json:"created_at"`
 	UpdatedAt       time.Time      `json:"updated_at"`
 	DeletedAt       gorm.DeletedAt `gorm:"index" json:"-"`
 }

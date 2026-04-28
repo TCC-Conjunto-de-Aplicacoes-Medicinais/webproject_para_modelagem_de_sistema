@@ -51,6 +51,13 @@ export const api = {
     });
   },
 
+  verifyCode: async (email: string, code: string) => {
+    return fetchWithConfig('/auth/verify', {
+      method: 'POST',
+      body: JSON.stringify({ email, code }),
+    });
+  },
+
   // --- Projects ---
   createProject: async (token: string, data: any) => {
     return fetchWithConfig('/projects', {

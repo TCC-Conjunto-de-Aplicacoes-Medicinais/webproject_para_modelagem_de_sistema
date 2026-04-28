@@ -53,18 +53,44 @@ func (s *AuthService) Register(ctx context.Context, clinic *domain.Clinic) error
 	}
 	clinic.Senha = hashedPassword
 
+	// Generate verification code
+	code := fmt.Sprintf("%06d", rand.New(rand.NewSource(time.Now().UnixNano())).Intn(1000000))
+	clinic.VerificationCode = code
+	clinic.Verify = false
+
 	// Save to DB
 	if err := s.clinicRepo.Save(ctx, clinic); err != nil {
 		return err
 	}
 
-	// Generate and send verification code (async or sync depending on requirements, here sync for simplicity)
+	// Send verification code
 	go func() {
-		code := fmt.Sprintf("%06d", rand.New(rand.NewSource(time.Now().UnixNano())).Intn(1000000))
 		_ = s.emailService.SendVerificationCode(context.Background(), clinic.Email, code)
 	}()
 
 	return nil
+}
+
+func (s *AuthService) VerifyCode(ctx context.Context, email, code string) error {
+	clinic, err := s.clinicRepo.FindByEmail(ctx, email)
+	if err != nil {
+		return err
+	}
+	if clinic == nil {
+		return errors.New("user not found")
+	}
+
+	if clinic.Verify {
+		return errors.New("user already verified")
+	}
+
+	if clinic.VerificationCode != code {
+		return errors.New("invalid verification code")
+	}
+
+	clinic.Verify = true
+	clinic.VerificationCode = ""
+	return s.clinicRepo.Save(ctx, clinic)
 }
 
 func (s *AuthService) Login(ctx context.Context, email, password string) (string, error) {
@@ -83,6 +109,10 @@ func (s *AuthService) Login(ctx context.Context, email, password string) (string
 	token, err := utils.GenerateJWT(clinic.ID, s.jwtSecret, s.jwtExpHours)
 	if err != nil {
 		return "", fmt.Errorf("failed to generate token: %v", err)
+	}
+
+	if !clinic.Verify {
+		return token, errors.New("unverified_account")
 	}
 
 	return token, nil

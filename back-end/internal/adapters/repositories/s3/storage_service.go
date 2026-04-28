@@ -19,10 +19,10 @@ type s3StorageService struct {
 	bucketName string
 }
 
-func NewS3StorageService(region, accessKey, secretKey, bucketName string) ports.StorageService {
+func NewS3StorageService(region, accessKey, secretKey, sessionToken, bucketName string) ports.StorageService {
 	cfg, err := config.LoadDefaultConfig(context.TODO(),
 		config.WithRegion(region),
-		config.WithCredentialsProvider(credentials.NewStaticCredentialsProvider(accessKey, secretKey, "")),
+		config.WithCredentialsProvider(credentials.NewStaticCredentialsProvider(accessKey, secretKey, sessionToken)),
 	)
 	if err != nil {
 		log.Fatalf("unable to load SDK config, %v", err)
@@ -80,4 +80,19 @@ func (s *s3StorageService) DeleteObject(ctx context.Context, tenantID, projectID
 	})
 
 	return err
+}
+
+func (s *s3StorageService) DownloadJSON(ctx context.Context, key string) ([]byte, error) {
+	out, err := s.client.GetObject(ctx, &s3.GetObjectInput{
+		Bucket: aws.String(s.bucketName),
+		Key:    aws.String(key),
+	})
+	if err != nil {
+		return nil, err
+	}
+	defer out.Body.Close()
+
+	buf := new(bytes.Buffer)
+	buf.ReadFrom(out.Body)
+	return buf.Bytes(), nil
 }

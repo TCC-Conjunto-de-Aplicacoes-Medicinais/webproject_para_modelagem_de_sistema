@@ -22,19 +22,13 @@ func main() {
 	// 2. Connect DB & Run Migrations
 	db := database.ConnectMariaDB(cfg)
 
-	// Clean up previously created Portuguese columns (from old AutoMigrate) to avoid schema conflicts
-	oldColumns := []string{"nome_responsavel", "senha", "nome_clinica", "localizacao", "especialidade", "telefone", "bucket_obj"}
-	for _, col := range oldColumns {
-		db.Exec("ALTER TABLE clinics DROP COLUMN " + col)
-	}
-
 	if err := db.AutoMigrate(&domain.Clinic{}); err != nil {
 		log.Fatalf("Failed to migrate database: %v", err)
 	}
 
 	// 3. Initialize Repositories and External Services
 	clinicRepo := mariadb.NewClinicRepository(db)
-	s3Service := s3.NewS3StorageService(cfg.AWSRegion, cfg.AWSAccessKeyID, cfg.AWSSecretAccessKey, cfg.AWSBucketName)
+	s3Service := s3.NewS3StorageService(cfg.AWSRegion, cfg.AWSAccessKeyID, cfg.AWSSecretAccessKey, cfg.AWSSessionToken, cfg.AWSBucketName)
 	emailService := email.NewSMTPEmailService(cfg.SMTPHost, cfg.SMTPPort, cfg.SMTPUser, cfg.SMTPPassword)
 
 	// 4. Initialize Core Services (Use Cases)
@@ -65,6 +59,7 @@ func main() {
 		{
 			auth.POST("/register", authHandler.Register)
 			auth.POST("/login", authHandler.Login)
+			auth.POST("/verify", authHandler.Verify)
 		}
 
 		// Protected Project Routes

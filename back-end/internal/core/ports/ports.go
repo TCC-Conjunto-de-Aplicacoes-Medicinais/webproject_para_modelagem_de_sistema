@@ -19,6 +19,7 @@ type StorageService interface {
 	UploadJSON(ctx context.Context, tenantID, projectID string, data []byte) error
 	ListObjects(ctx context.Context, tenantID string) ([]string, error)
 	DeleteObject(ctx context.Context, tenantID, projectID string) error
+	DownloadJSON(ctx context.Context, key string) ([]byte, error)
 }
 
 // EmailService defines methods for sending emails

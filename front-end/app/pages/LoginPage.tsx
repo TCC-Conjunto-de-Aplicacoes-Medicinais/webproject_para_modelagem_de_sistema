@@ -70,6 +70,10 @@ export default function LoginPage() {
       await login(credentials);
       navigateTo(PageRoute.SYSTEM_CREATION);
     } catch (err: any) {
+      if (err.message === 'unverified_account') {
+        navigateTo(PageRoute.VERIFY);
+        return;
+      }
       let msg = err.message || 'Erro ao realizar login. Verifique suas credenciais.';
       if (msg.includes('invalid credentials') || msg.includes('record not found')) {
         msg = 'E-mail ou senha incorretos.';
