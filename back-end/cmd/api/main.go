@@ -83,8 +83,14 @@ func main() {
 	}
 
 	// 8. Servir Arquivos Estáticos do Next.js (front-end)
-	// O diretório ./static contém o output do `next build` (export)
 	staticDir := "./static"
+	
+	// Serve a pasta _next diretamente com alta performance (sem passar pelo fallback)
+	r.Static("/_next", filepath.Join(staticDir, "_next"))
+
+	// Serve arquivos estáticos da raiz (como favicon, robos.txt, imagens)
+	// r.Static("/assets", filepath.Join(staticDir, "assets")) // caso tenha
+	
 	r.NoRoute(func(c *gin.Context) {
 		requestPath := c.Request.URL.Path
 
@@ -94,31 +100,33 @@ func main() {
 			return
 		}
 
-		// Tenta servir o arquivo estático diretamente
-		filePath := filepath.Join(staticDir, requestPath)
+		// Remove barras duplas e limpa o path
+		cleanPath := filepath.Clean(requestPath)
+		filePath := filepath.Join(staticDir, cleanPath)
 
-		// Se o arquivo existe, serve diretamente (JS, CSS, imagens, etc.)
+		// Se o arquivo existe, serve diretamente (JS, CSS, imagens na raiz)
 		if info, err := os.Stat(filePath); err == nil && !info.IsDir() {
 			c.File(filePath)
 			return
 		}
 
 		// Para rotas do SPA, tenta servir o arquivo .html correspondente
-		// Ex: /about → /about.html
 		htmlPath := filePath + ".html"
 		if _, err := os.Stat(htmlPath); err == nil {
 			c.File(htmlPath)
 			return
 		}
 
-		// Fallback: serve o index.html (SPA routing)
+		// Fallback final: serve o index.html (SPA routing)
 		indexPath := filepath.Join(staticDir, "index.html")
 		if _, err := os.Stat(indexPath); err == nil {
 			c.File(indexPath)
 			return
 		}
 
-		c.JSON(http.StatusNotFound, gin.H{"error": "Page not found"})
+		// Se chegou aqui, não achou nem a rota nem arquivo
+		log.Printf("[404] Arquivo ou Rota não encontrada: %s (buscado em: %s)", requestPath, filePath)
+		c.JSON(http.StatusNotFound, gin.H{"error": "Page or file not found"})
 	})
 
 	// 9. Start Server
