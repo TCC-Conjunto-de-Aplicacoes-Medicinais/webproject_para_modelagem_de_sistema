@@ -17,6 +17,7 @@ import { useTheme, useMediaQuery } from '@mui/material';
 import ArrowBackIcon from '@mui/icons-material/ArrowBack';
 import ArrowForwardIcon from '@mui/icons-material/ArrowForward';
 import VisibilityIcon from '@mui/icons-material/Visibility';
+import FullscreenIcon from '@mui/icons-material/Fullscreen';
 import CloseIcon from '@mui/icons-material/Close';
 import { useState } from 'react';
 import { useSystemConfig } from '@/app/contexts/SystemConfigContext';
@@ -36,19 +37,26 @@ export default function GuidedWizard({ onComplete }: GuidedWizardProps) {
   const theme = useTheme();
   const isMobile = useMediaQuery(theme.breakpoints.down('lg'));
   const [previewOpen, setPreviewOpen] = useState(false);
+  const [fullscreen, setFullscreen] = useState(false);
   const containerRef = useRef<HTMLDivElement>(null);
+
+  // Track if all module tabs have been visited (for step 1 validation)
+  const [allModuleTabsVisited, setAllModuleTabsVisited] = useState(false);
 
   // Scroll to top when step changes
   useEffect(() => {
     window.scrollTo({ top: 0, behavior: 'smooth' });
   }, [state.currentStep]);
 
+  // Determine if the "next" button should be enabled
+  const isNextDisabled = state.currentStep === 1 && !allModuleTabsVisited;
+
   const renderStep = () => {
     switch (state.currentStep) {
       case 0:
         return <StepIdentity />;
       case 1:
-        return <StepModules />;
+        return <StepModules onAllTabsVisited={setAllModuleTabsVisited} />;
       case 2:
         return <StepTechnical />;
       case 3:
@@ -160,15 +168,23 @@ export default function GuidedWizard({ onComplete }: GuidedWizardProps) {
           )}
 
           {canGoNext && state.currentStep < 3 && (
-            <Button
-              variant="contained"
-              color="secondary"
-              endIcon={<ArrowForwardIcon />}
-              onClick={goNext}
-              sx={{ px: 4 }}
+            <Tooltip
+              title={isNextDisabled ? 'Visite todas as abas (Médico, Assistente, Gerencial) antes de prosseguir' : ''}
+              arrow
             >
-              Próximo
-            </Button>
+              <span>
+                <Button
+                  variant="contained"
+                  color="secondary"
+                  endIcon={<ArrowForwardIcon />}
+                  onClick={goNext}
+                  disabled={isNextDisabled}
+                  sx={{ px: 4 }}
+                >
+                  Próximo
+                </Button>
+              </span>
+            </Tooltip>
           )}
         </Box>
       </Box>
@@ -200,9 +216,29 @@ export default function GuidedWizard({ onComplete }: GuidedWizardProps) {
             }}
           >
             <VisibilityIcon sx={{ fontSize: 18, color: 'secondary.main' }} />
-            <Typography variant="body2" sx={{ fontWeight: 600, color: 'text.primary' }}>
+            <Typography variant="body2" sx={{ fontWeight: 600, color: 'text.primary', flex: 1 }}>
               Pré-visualização
             </Typography>
+            {/* Fullscreen button — now visible and next to the title */}
+            <Tooltip title="Abrir em tela cheia" arrow>
+              <IconButton
+                onClick={() => setFullscreen(true)}
+                size="small"
+                sx={{
+                  backgroundColor: 'secondary.main',
+                  color: '#fff',
+                  width: 32,
+                  height: 32,
+                  '&:hover': {
+                    backgroundColor: 'secondary.dark',
+                    transform: 'scale(1.1)',
+                  },
+                  transition: 'all 0.2s ease',
+                }}
+              >
+                <FullscreenIcon sx={{ fontSize: 18 }} />
+              </IconButton>
+            </Tooltip>
           </Box>
           <Box
             sx={{
@@ -210,7 +246,7 @@ export default function GuidedWizard({ onComplete }: GuidedWizardProps) {
               overflow: 'auto',
             }}
           >
-            <SystemPreview />
+            <SystemPreview fullscreen={fullscreen} onFullscreenChange={setFullscreen} />
           </Box>
         </Box>
       )}
@@ -261,12 +297,25 @@ export default function GuidedWizard({ onComplete }: GuidedWizardProps) {
                   Pré-visualização
                 </Typography>
               </Box>
-              <IconButton onClick={() => setPreviewOpen(false)} size="small">
-                <CloseIcon fontSize="small" />
-              </IconButton>
+              <Box sx={{ display: 'flex', gap: 1 }}>
+                <IconButton
+                  onClick={() => { setPreviewOpen(false); setFullscreen(true); }}
+                  size="small"
+                  sx={{
+                    backgroundColor: 'secondary.main',
+                    color: '#fff',
+                    '&:hover': { backgroundColor: 'secondary.dark' },
+                  }}
+                >
+                  <FullscreenIcon sx={{ fontSize: 16 }} />
+                </IconButton>
+                <IconButton onClick={() => setPreviewOpen(false)} size="small">
+                  <CloseIcon fontSize="small" />
+                </IconButton>
+              </Box>
             </Box>
             <Box sx={{ flex: 1, overflow: 'auto' }}>
-              <SystemPreview />
+              <SystemPreview fullscreen={fullscreen} onFullscreenChange={setFullscreen} />
             </Box>
           </Drawer>
         </>

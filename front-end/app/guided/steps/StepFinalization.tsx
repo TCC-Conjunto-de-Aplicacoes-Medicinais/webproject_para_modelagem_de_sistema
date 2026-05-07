@@ -18,6 +18,7 @@ import PaletteIcon from '@mui/icons-material/Palette';
 import ExtensionIcon from '@mui/icons-material/Extension';
 import DnsIcon from '@mui/icons-material/Dns';
 import SupportAgentIcon from '@mui/icons-material/SupportAgent';
+import LockOutlinedIcon from '@mui/icons-material/LockOutlined';
 import { useTheme } from '@mui/material/styles';
 import { useSystemConfig } from '@/app/contexts/SystemConfigContext';
 
@@ -435,6 +436,16 @@ export default function StepFinalization({ onComplete }: StepFinalizationProps) 
 
       {/* Finalize Button */}
       <Box sx={{ textAlign: 'center' }}>
+        {/* Security badge */}
+        <Box sx={{ display: 'flex', justifyContent: 'center', mb: 2 }}>
+          <Box sx={{ display: 'flex', alignItems: 'center', gap: 0.5, px: 1.5, py: 0.5, borderRadius: 2, backgroundColor: `${accentColor}08`, border: `1px solid ${accentColor}20` }}>
+            <LockOutlinedIcon sx={{ fontSize: 14, color: accentColor }} />
+            <Typography variant="caption" sx={{ color: accentColor, fontWeight: 600 }}>
+              Dados protegidos com criptografia AES-256
+            </Typography>
+          </Box>
+        </Box>
+
         {saveError && (
           <Typography variant="body2" color="error" sx={{ mb: 2 }}>
             {saveError}
@@ -469,10 +480,13 @@ export default function StepFinalization({ onComplete }: StepFinalizationProps) 
       </Box>
 
       {/* Success Dialog */}
-      <SuccessAnimation open={showSuccess} onClose={() => {
-        setShowSuccess(false);
-        onComplete?.();
-      }} />
+      <SuccessAnimation
+        open={showSuccess}
+        onClose={() => {
+          setShowSuccess(false);
+          onComplete?.();
+        }}
+      />
     </Box>
   );
 }

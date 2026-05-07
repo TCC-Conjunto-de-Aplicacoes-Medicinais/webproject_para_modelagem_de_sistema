@@ -33,7 +33,7 @@ func main() {
 
 	// 4. Initialize Core Services (Use Cases)
 	authService := services.NewAuthService(clinicRepo, emailService, cfg.JWTSecret, cfg.JWTExpirationHours)
-	projectService := services.NewProjectService(s3Service, clinicRepo)
+	projectService := services.NewProjectService(s3Service, clinicRepo, cfg.ObjectVaultKey)
 
 	// 5. Initialize HTTP Handlers
 	authHandler := http.NewAuthHandler(authService)

@@ -16,6 +16,7 @@ import SettingsIcon from '@mui/icons-material/Settings';
 import TimelineIcon from '@mui/icons-material/Timeline';
 import DesktopWindowsIcon from '@mui/icons-material/DesktopWindows';
 import { useNavigation } from '@/app/contexts/NavigationContext';
+import { useAuth } from '@/app/contexts/AuthContext';
 import { PageRoute } from '@/app/types';
 
 const BENEFITS = [
@@ -58,6 +59,7 @@ export default function LandingPage() {
   const { navigateTo } = useNavigation();
   const theme = useTheme();
   const isDark = theme.palette.mode === 'dark';
+  const { isAuthenticated } = useAuth();
 
   return (
     <Box>
@@ -175,10 +177,10 @@ export default function LandingPage() {
                 color="secondary"
                 size="large"
                 endIcon={<ArrowForwardIcon />}
-                onClick={() => navigateTo(PageRoute.REGISTER)}
+                onClick={() => navigateTo(isAuthenticated ? PageRoute.SYSTEM_CREATION : PageRoute.REGISTER)}
                 sx={{ px: 4, py: 1.5, fontSize: '1rem' }}
               >
-                Comece agora
+                {isAuthenticated ? 'Acessar Sistema' : 'Comece agora'}
               </Button>
               <Button
                 variant="outlined"
@@ -320,10 +322,10 @@ export default function LandingPage() {
               color="primary"
               size="large"
               endIcon={<ArrowForwardIcon />}
-              onClick={() => navigateTo(PageRoute.REGISTER)}
+              onClick={() => navigateTo(isAuthenticated ? PageRoute.SYSTEM_CREATION : PageRoute.REGISTER)}
               sx={{ px: 5, py: 1.5, fontSize: '1rem' }}
             >
-              Criar minha conta
+              {isAuthenticated ? 'Acessar Sistema' : 'Criar minha conta'}
             </Button>
           </Box>
         </Container>

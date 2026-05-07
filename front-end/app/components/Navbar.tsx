@@ -19,7 +19,9 @@ import DarkModeIcon from '@mui/icons-material/DarkMode';
 import LightModeIcon from '@mui/icons-material/LightMode';
 import { useNavigation } from '@/app/contexts/NavigationContext';
 import { useThemeMode } from '@/app/contexts/ThemeContext';
+import { useAuth } from '@/app/contexts/AuthContext';
 import { PageRoute } from '@/app/types';
+import logo from '@/app/logo.png';
 
 const NAV_ITEMS = [
   { label: 'Início', route: PageRoute.LANDING },
@@ -29,6 +31,7 @@ const NAV_ITEMS = [
 export default function Navbar() {
   const { currentPage, navigateTo } = useNavigation();
   const { mode, toggleTheme } = useThemeMode();
+  const { isAuthenticated, logout, userEmail } = useAuth();
   const [mobileOpen, setMobileOpen] = useState(false);
 
   const handleDrawerToggle = () => {
@@ -61,7 +64,7 @@ export default function Navbar() {
             }}
             onClick={() => handleNavigate(PageRoute.LANDING)}
           >
-            <AutoAwesomeIcon sx={{ color: 'secondary.main', fontSize: 28 }} />
+            <img src={logo.src} alt="Logo" style={{ width: 40, height: 40 }} />
             <Typography
               variant="h5"
               sx={{
@@ -72,7 +75,7 @@ export default function Navbar() {
                 letterSpacing: '-0.02em',
               }}
             >
-              ClinicaGen
+              POHINC: ClinicaGen
             </Typography>
           </Box>
 
@@ -88,16 +91,16 @@ export default function Navbar() {
                   position: 'relative',
                   '&::after': currentPage === route
                     ? {
-                        content: '""',
-                        position: 'absolute',
-                        bottom: 4,
-                        left: '50%',
-                        transform: 'translateX(-50%)',
-                        width: 20,
-                        height: 3,
-                        borderRadius: 2,
-                        background: 'linear-gradient(135deg, #1B5E3B, #00C853)',
-                      }
+                      content: '""',
+                      position: 'absolute',
+                      bottom: 4,
+                      left: '50%',
+                      transform: 'translateX(-50%)',
+                      width: 20,
+                      height: 3,
+                      borderRadius: 2,
+                      background: 'linear-gradient(135deg, #1B5E3B, #00C853)',
+                    }
                     : {},
                 }}
               >
@@ -124,28 +127,54 @@ export default function Navbar() {
               </IconButton>
             </Tooltip>
 
-            <Button
-              variant="outlined"
-              onClick={() => handleNavigate(PageRoute.LOGIN)}
-              sx={{
-                ml: 0.5,
-                borderColor: 'grey.300',
-                color: 'text.primary',
-                '&:hover': {
-                  borderColor: 'primary.main',
-                  backgroundColor: 'transparent',
-                },
-              }}
-            >
-              Entrar
-            </Button>
-            <Button
-              variant="contained"
-              color="primary"
-              onClick={() => handleNavigate(PageRoute.REGISTER)}
-            >
-              Cadastrar
-            </Button>
+            {isAuthenticated ? (
+              <Box sx={{ display: 'flex', alignItems: 'center', gap: 2, ml: 1 }}>
+                {userEmail && (
+                  <Typography variant="body2" color="text.secondary" sx={{ display: { xs: 'none', lg: 'block' } }}>
+                    {userEmail}
+                  </Typography>
+                )}
+                <Button
+                  variant="outlined"
+                  onClick={logout}
+                  sx={{
+                    borderColor: 'error.main',
+                    color: 'error.main',
+                    '&:hover': {
+                      borderColor: 'error.dark',
+                      backgroundColor: 'rgba(211, 47, 47, 0.04)',
+                    },
+                  }}
+                >
+                  Sair
+                </Button>
+              </Box>
+            ) : (
+              <>
+                <Button
+                  variant="outlined"
+                  onClick={() => handleNavigate(PageRoute.LOGIN)}
+                  sx={{
+                    ml: 0.5,
+                    borderColor: 'grey.300',
+                    color: 'text.primary',
+                    '&:hover': {
+                      borderColor: 'primary.main',
+                      backgroundColor: 'transparent',
+                    },
+                  }}
+                >
+                  Entrar
+                </Button>
+                <Button
+                  variant="contained"
+                  color="primary"
+                  onClick={() => handleNavigate(PageRoute.REGISTER)}
+                >
+                  Cadastrar
+                </Button>
+              </>
+            )}
           </Box>
 
           {/* Mobile Menu Button */}
@@ -200,23 +229,36 @@ export default function Navbar() {
               </ListItemButton>
             </ListItem>
           ))}
-          <ListItem disablePadding>
-            <ListItemButton
-              onClick={() => handleNavigate(PageRoute.LOGIN)}
-              sx={{ borderRadius: 2, mx: 1 }}
-            >
-              <ListItemText primary="Entrar" />
-            </ListItemButton>
-          </ListItem>
-          <ListItem disablePadding sx={{ px: 2, pt: 1 }}>
-            <Button
-              variant="contained"
-              fullWidth
-              onClick={() => handleNavigate(PageRoute.REGISTER)}
-            >
-              Cadastrar
-            </Button>
-          </ListItem>
+          {isAuthenticated ? (
+            <ListItem disablePadding>
+              <ListItemButton
+                onClick={() => { logout(); setMobileOpen(false); }}
+                sx={{ borderRadius: 2, mx: 1, color: 'error.main' }}
+              >
+                <ListItemText primary="Sair" />
+              </ListItemButton>
+            </ListItem>
+          ) : (
+            <>
+              <ListItem disablePadding>
+                <ListItemButton
+                  onClick={() => handleNavigate(PageRoute.LOGIN)}
+                  sx={{ borderRadius: 2, mx: 1 }}
+                >
+                  <ListItemText primary="Entrar" />
+                </ListItemButton>
+              </ListItem>
+              <ListItem disablePadding sx={{ px: 2, pt: 1 }}>
+                <Button
+                  variant="contained"
+                  fullWidth
+                  onClick={() => handleNavigate(PageRoute.REGISTER)}
+                >
+                  Cadastrar
+                </Button>
+              </ListItem>
+            </>
+          )}
         </List>
       </Drawer>
     </>

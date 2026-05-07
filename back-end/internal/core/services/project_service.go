@@ -6,7 +6,7 @@ import (
 	"errors"
 	"fmt"
 	"openhealth/internal/core/ports"
-	"time"
+	"openhealth/pkg/vault"
 
 	"github.com/google/uuid"
 )
@@ -14,20 +14,15 @@ import (
 type ProjectService struct {
 	storageService ports.StorageService
 	clinicRepo     ports.ClinicRepository
+	seedToken      string // vault key component from environment
 }
 
-func NewProjectService(storageService ports.StorageService, clinicRepo ports.ClinicRepository) *ProjectService {
+func NewProjectService(storageService ports.StorageService, clinicRepo ports.ClinicRepository, seedToken string) *ProjectService {
 	return &ProjectService{
 		storageService: storageService,
 		clinicRepo:     clinicRepo,
+		seedToken:      seedToken,
 	}
-}
-
-// ProjectData represents the structure of the JSON to be saved in S3
-type ProjectData struct {
-	ID        string      `json:"id"`
-	CreatedAt time.Time   `json:"created_at"`
-	Data      interface{} `json:"data"` // Flexible structure from frontend wizard
 }
 
 func (s *ProjectService) CreateProject(ctx context.Context, tenantID string, inputData interface{}) (string, error) {
@@ -39,21 +34,31 @@ func (s *ProjectService) CreateProject(ctx context.Context, tenantID string, inp
 		return "", errors.New("tenant not found")
 	}
 
-	projectID := uuid.New().String()
-	
-	proj := ProjectData{
-		ID:        projectID,
-		CreatedAt: time.Now(),
-		Data:      inputData,
+	dataMap, ok := inputData.(map[string]interface{})
+	if !ok {
+		return "", errors.New("invalid input data format")
 	}
 
-	jsonData, err := json.Marshal(proj)
+	projectID, _ := dataMap["id"].(string)
+	if projectID == "" {
+		projectID = uuid.New().String()
+		dataMap["id"] = projectID
+	}
+
+	jsonData, err := json.Marshal(dataMap)
 	if err != nil {
 		return "", fmt.Errorf("failed to marshal project data: %v", err)
 	}
 
-	// Upload to S3
-	if err := s.storageService.UploadJSON(ctx, tenantID, projectID, jsonData); err != nil {
+	// Seal (encrypt) the object before uploading to S3
+	// Key composition: nodeRef=email, branchId=cnpj, seedToken=env
+	sealedData, err := vault.Seal(jsonData, clinic.Email, clinic.CNPJ, s.seedToken)
+	if err != nil {
+		return "", fmt.Errorf("failed to seal project data: %v", err)
+	}
+
+	// Upload sealed object to S3
+	if err := s.storageService.UploadJSON(ctx, tenantID, projectID, sealedData); err != nil {
 		return "", fmt.Errorf("failed to upload to S3: %v", err)
 	}
 
@@ -61,7 +66,6 @@ func (s *ProjectService) CreateProject(ctx context.Context, tenantID string, inp
 	if clinic.BucketObj == "" {
 		bucketRef := fmt.Sprintf("%s/", tenantID)
 		if err := s.clinicRepo.UpdateBucketRef(ctx, tenantID, bucketRef); err != nil {
-			// Non-critical, could log it, but returning error for strictness
 			return projectID, fmt.Errorf("project created, but failed to update bucket ref: %v", err)
 		}
 	}
@@ -70,6 +74,14 @@ func (s *ProjectService) CreateProject(ctx context.Context, tenantID string, inp
 }
 
 func (s *ProjectService) ListProjects(ctx context.Context, tenantID string) ([]interface{}, error) {
+	clinic, err := s.clinicRepo.FindByID(ctx, tenantID)
+	if err != nil {
+		return nil, err
+	}
+	if clinic == nil {
+		return nil, errors.New("tenant not found")
+	}
+
 	keys, err := s.storageService.ListObjects(ctx, tenantID)
 	if err != nil {
 		return nil, err
@@ -79,11 +91,22 @@ func (s *ProjectService) ListProjects(ctx context.Context, tenantID string) ([]i
 	for _, key := range keys {
 		data, err := s.storageService.DownloadJSON(ctx, key)
 		if err != nil {
-			// Skip or log error, but keep listing others
 			continue
 		}
+
+		// Unseal (decrypt) the object
+		plaintext, err := vault.Unseal(data, clinic.Email, clinic.CNPJ, s.seedToken)
+		if err != nil {
+			// If unseal fails, try reading as plain JSON (backward compatibility)
+			var parsed interface{}
+			if jsonErr := json.Unmarshal(data, &parsed); jsonErr == nil {
+				projects = append(projects, parsed)
+			}
+			continue
+		}
+
 		var parsed interface{}
-		if err := json.Unmarshal(data, &parsed); err == nil {
+		if err := json.Unmarshal(plaintext, &parsed); err == nil {
 			projects = append(projects, parsed)
 		}
 	}

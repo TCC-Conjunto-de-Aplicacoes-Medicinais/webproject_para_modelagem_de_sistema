@@ -27,6 +27,7 @@ type Config struct {
 	AWSSecretAccessKey string
 	AWSSessionToken    string
 	AWSBucketName      string
+	ObjectVaultKey     string
 }
 
 func LoadConfig() *Config {
@@ -35,7 +36,7 @@ func LoadConfig() *Config {
 		log.Println("Warning: .env file not found. Loading from environment variables.")
 	}
 
-	jwtExp, _ := strconv.Atoi(getEnv("JWT_EXPIRATION_HOURS", "24"))
+	jwtExp, _ := strconv.Atoi(getEnv("JWT_EXPIRATION_HOURS", "168"))
 	smtpPort, _ := strconv.Atoi(getEnv("SMTP_PORT", "587"))
 
 	return &Config{
@@ -57,6 +58,7 @@ func LoadConfig() *Config {
 		AWSSecretAccessKey: getEnv("AWS_SECRET_ACCESS_KEY", ""),
 		AWSSessionToken:    getEnv("AWS_SESSION_TOKEN", ""),
 		AWSBucketName:      getEnv("AWS_BUCKET_NAME", ""),
+		ObjectVaultKey:     getEnv("OBJ_KEY", ""),
 	}
 }
 

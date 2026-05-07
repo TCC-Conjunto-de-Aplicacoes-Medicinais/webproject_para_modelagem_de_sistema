@@ -7,6 +7,7 @@ import Divider from '@mui/material/Divider';
 import AutoAwesomeIcon from '@mui/icons-material/AutoAwesome';
 import { useNavigation } from '@/app/contexts/NavigationContext';
 import { PageRoute } from '@/app/types';
+import logo from '@/app/logo.png';
 
 const FOOTER_LINKS = [
   { label: 'Início', route: PageRoute.LANDING },
@@ -46,7 +47,7 @@ export default function Footer() {
         {/* Logo & Description */}
         <Box sx={{ textAlign: { xs: 'center', md: 'left' }, maxWidth: 320 }}>
           <Box sx={{ display: 'flex', alignItems: 'center', gap: 1, justifyContent: { xs: 'center', md: 'flex-start' } }}>
-            <AutoAwesomeIcon sx={{ color: 'secondary.main', fontSize: 24 }} />
+            <img src={logo.src} alt="Logo" style={{ width: 40, height: 40 }} />
             <Typography
               variant="h6"
               sx={{
@@ -56,7 +57,7 @@ export default function Footer() {
                 WebkitTextFillColor: 'transparent',
               }}
             >
-              ClinicaGen
+              POHINC: ClinicaGen
             </Typography>
           </Box>
           <Typography variant="body2" sx={{ mt: 1.5, color: 'text.secondary' }}>

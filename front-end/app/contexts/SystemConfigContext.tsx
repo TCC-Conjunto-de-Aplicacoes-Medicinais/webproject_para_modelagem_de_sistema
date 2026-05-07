@@ -42,9 +42,9 @@ const DEFAULT_MODULES: ModulesConfig = {
         files: true,
         allergies: true,
         fileUpload: true,
-        aiEcg: false,
+        aiEcg: true,
         prescriptions: true,
-        prescriptionTemplate: false,
+        prescriptionTemplate: true,
         digitalSignature: true,
         stampedPrescription: true,
         medicationControl: true,
@@ -116,8 +116,11 @@ async function loadProjectsFromApi(token: string): Promise<SystemBlueprint[]> {
     // Como a API atual só lista nomes de objetos, podemos ignorar a extração detalhada
     // se não houver um endpoint que retorne o conteúdo do arquivo.
     // MAS, vamos deixar este stub pronto.
-    // Filtra possíveis objetos malformados
-    return (data.projects || []).filter((p: any) => p && p.identity);
+    // Desempacota projetos antigos que vinham dentro de { data: ... } e filtra malformados
+    const rawProjects = data.projects || [];
+    return rawProjects
+      .map((p: any) => (p.data ? p.data : p))
+      .filter((p: any) => p && p.identity);
   } catch (err) {
     console.error('Falha ao carregar projetos da API', err);
     return [];
@@ -331,11 +334,16 @@ export function SystemConfigProvider({ children }: SystemConfigProviderProps) {
   const reset = useCallback(() => dispatch({ type: 'RESET' }), []);
 
   const generateBlueprint = useCallback((): SystemBlueprint => {
+    const now = new Date();
     return {
       id: uuidv4(),
       version: '1.0.0',
-      createdAt: new Date().toISOString(),
-      identity: state.identity,
+      createdAt: now.toISOString(),
+      identity: {
+        ...state.identity,
+        // Remove base64 logo data from blueprint to reduce size
+        logoFile: state.identity.logoType === 'custom' ? '[LOGO_UPLOADED]' : null,
+      },
       modules: state.modules,
       technical: state.technical,
       implementation: state.implementation,

@@ -8,12 +8,10 @@ import CalendarMonthIcon from '@mui/icons-material/CalendarMonth';
 import HistoryIcon from '@mui/icons-material/History';
 import SettingsIcon from '@mui/icons-material/Settings';
 import AttachMoneyIcon from '@mui/icons-material/AttachMoney';
-import BarChartIcon from '@mui/icons-material/BarChart';
 import EventNoteIcon from '@mui/icons-material/EventNote';
 import HowToRegIcon from '@mui/icons-material/HowToReg';
 import PersonAddIcon from '@mui/icons-material/PersonAdd';
 import BadgeIcon from '@mui/icons-material/Badge';
-import FactCheckIcon from '@mui/icons-material/FactCheck';
 import { useTheme } from '@mui/material/styles';
 import { useSystemConfig } from '@/app/contexts/SystemConfigContext';
 import { PALETTE_OPTIONS } from '@/app/guided/constants';
@@ -57,10 +55,8 @@ export default function PreviewSidebar({ activeScreen, onSelectScreen, activeRol
   }
 
   // ─── Assistant View ───────────────────────────
+  // Removed "Agendar" duplicate — only "Agendas" (doctorScheduleView) remains
   if (activeRole === 'assistant') {
-    if (assistant.features.scheduling) {
-      items.push({ id: 'scheduling', icon: <EventNoteIcon sx={{ fontSize: 12 }} />, label: 'Agendar' });
-    }
     if (assistant.features.doctorScheduleView) {
       items.push({ id: 'doctor-schedule', icon: <CalendarMonthIcon sx={{ fontSize: 12 }} />, label: 'Agendas' });
     }
@@ -76,21 +72,16 @@ export default function PreviewSidebar({ activeScreen, onSelectScreen, activeRol
   }
 
   // ─── Management View ──────────────────────────
+  // Removed "Relatórios" — billing/financial covers reporting needs
   if (activeRole === 'management') {
     if (management.features.doctorSchedules) {
       items.push({ id: 'doctor-schedule', icon: <CalendarMonthIcon sx={{ fontSize: 12 }} />, label: 'Agendas' });
     }
-    if (management.features.attendanceControl) {
-      items.push({ id: 'attendance', icon: <FactCheckIcon sx={{ fontSize: 12 }} />, label: 'Presença' });
-    }
-    if (management.features.staffRegistration) {
+    if (management.features.attendanceControl || management.features.staffRegistration) {
       items.push({ id: 'staff', icon: <BadgeIcon sx={{ fontSize: 12 }} />, label: 'Equipe' });
     }
     if (management.features.billingControl) {
       items.push({ id: 'financial', icon: <AttachMoneyIcon sx={{ fontSize: 12 }} />, label: 'Faturamento' });
-    }
-    if (management.features.dashboards) {
-      items.push({ id: 'reports', icon: <BarChartIcon sx={{ fontSize: 12 }} />, label: 'Relatórios' });
     }
   }
 

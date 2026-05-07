@@ -274,6 +274,8 @@ export default function StepTechnical() {
               accentColor={accentColor}
             />
           </Box>
+          {/* TODO: Habilitar quando app desktop estiver pronto */}
+          {/*
           <Box sx={{ flex: 1 }}>
             <OptionCard
               selected={technical.deploymentType === 'desktop'}
@@ -284,6 +286,7 @@ export default function StepTechnical() {
               accentColor={accentColor}
             />
           </Box>
+          */}
         </Box>
       </Box>
 

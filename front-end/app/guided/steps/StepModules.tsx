@@ -1,6 +1,6 @@
 'use client';
 
-import { useState } from 'react';
+import { useState, useEffect, useCallback } from 'react';
 import Box from '@mui/material/Box';
 import Typography from '@mui/material/Typography';
 import Tabs from '@mui/material/Tabs';
@@ -13,12 +13,14 @@ import Collapse from '@mui/material/Collapse';
 import Divider from '@mui/material/Divider';
 import Tooltip from '@mui/material/Tooltip';
 import Alert from '@mui/material/Alert';
+import Chip from '@mui/material/Chip';
 import InfoOutlinedIcon from '@mui/icons-material/InfoOutlined';
 import { useTheme } from '@mui/material/styles';
 import MedicalServicesIcon from '@mui/icons-material/MedicalServices';
 import SupportAgentIcon from '@mui/icons-material/SupportAgent';
 import BusinessCenterIcon from '@mui/icons-material/BusinessCenter';
 import TuneIcon from '@mui/icons-material/Tune';
+import CheckCircleOutlineIcon from '@mui/icons-material/CheckCircleOutline';
 import { useSystemConfig } from '@/app/contexts/SystemConfigContext';
 import type {
   DoctorFeatures,
@@ -57,8 +59,7 @@ const PATIENT_RECORD_SUBFEATURES: FeatureItem[] = [
 ];
 
 const ASSISTANT_FEATURES: FeatureItem[] = [
-  { key: 'scheduling', label: 'Agendamento', description: 'Agende consultas para os pacientes' },
-  { key: 'doctorScheduleView', label: 'Agenda dos Médicos', description: 'Consulte a disponibilidade dos médicos' },
+  { key: 'doctorScheduleView', label: 'Agendas', description: 'Consulte a disponibilidade e agende para os médicos' },
   { key: 'patientManagement', label: 'Gestão de Pacientes', description: 'Cadastro e atualização de dados dos pacientes' },
   { key: 'billing', label: 'Faturamento', description: 'Controle de faturamento por convênio — discrimine o que cada convênio deve ao final do mês' },
   { key: 'insurancePlans', label: 'Convênios', description: 'Gerenciamento dos convênios aceitos pela clínica' },
@@ -156,14 +157,43 @@ function FeatureToggle({ feature, checked, onChange, indent, accentColor }: Feat
 
 // ─── Main Component ─────────────────────────────────────
 
-export default function StepModules() {
+interface StepModulesProps {
+  /** Callback to notify parent when all tabs have been visited */
+  onAllTabsVisited?: (visited: boolean) => void;
+}
+
+export default function StepModules({ onAllTabsVisited }: StepModulesProps) {
   const { state, updateModules } = useSystemConfig();
   const [tabIndex, setTabIndex] = useState(0);
+  const [visitedTabs, setVisitedTabs] = useState<Set<number>>(new Set([0])); // Start with first tab visited
   const theme = useTheme();
   const isDark = theme.palette.mode === 'dark';
   const { doctor, assistant, management, shared } = state.modules;
 
   const accentColor = '#00C853';
+
+  // Track tab visits
+  const handleTabChange = useCallback((_: unknown, newValue: number) => {
+    setTabIndex(newValue);
+    setVisitedTabs((prev) => {
+      const next = new Set(prev);
+      next.add(newValue);
+      return next;
+    });
+  }, []);
+
+  // Notify parent about tab visit status
+  useEffect(() => {
+    const allVisited = visitedTabs.has(0) && visitedTabs.has(1) && visitedTabs.has(2);
+    onAllTabsVisited?.(allVisited);
+  }, [visitedTabs, onAllTabsVisited]);
+
+  // Tab labels with visit indicators
+  const TAB_CONFIGS = [
+    { label: 'Médico', icon: <MedicalServicesIcon sx={{ fontSize: 18 }} />, index: 0 },
+    { label: 'Assistente', icon: <SupportAgentIcon sx={{ fontSize: 18 }} />, index: 1 },
+    { label: 'Gerencial', icon: <BusinessCenterIcon sx={{ fontSize: 18 }} />, index: 2 },
+  ];
 
   // ─── Doctor Handlers ──────────────────────────────
 
@@ -241,12 +271,6 @@ export default function StepModules() {
     });
   };
 
-  // ─── Shared Handlers ─────────────────────────────
-
-  const toggleSettings = (value: boolean) => {
-    updateModules({ shared: { settings: value } });
-  };
-
   return (
     <Box>
       {/* Header */}
@@ -261,9 +285,32 @@ export default function StepModules() {
           Escolha quais funcionalidades cada perfil terá acesso no sistema. O preview à
           direita atualiza em tempo real.
         </Typography>
+
+        {/* Tab visit progress indicator */}
+        <Box sx={{ display: 'flex', alignItems: 'center', gap: 1, mt: 1.5 }}>
+          <Typography variant="caption" sx={{ color: 'text.secondary', fontWeight: 500 }}>
+            Abas visitadas:
+          </Typography>
+          {TAB_CONFIGS.map((tab) => (
+            <Chip
+              key={tab.index}
+              label={tab.label}
+              size="small"
+              icon={visitedTabs.has(tab.index) ? <CheckCircleOutlineIcon sx={{ fontSize: '14px !important', color: `${accentColor} !important` }} /> : undefined}
+              sx={{
+                fontSize: '0.7rem',
+                fontWeight: 500,
+                backgroundColor: visitedTabs.has(tab.index) ? `${accentColor}15` : 'action.hover',
+                color: visitedTabs.has(tab.index) ? accentColor : 'text.secondary',
+                borderColor: visitedTabs.has(tab.index) ? `${accentColor}40` : 'transparent',
+                border: '1px solid',
+              }}
+            />
+          ))}
+        </Box>
       </Box>
 
-      {/* Tabs */}
+      {/* Tabs — 3 tabs only: Médico, Assistente, Gerencial (removed "Geral") */}
       <Box
         sx={{
           borderBottom: 1,
@@ -273,7 +320,7 @@ export default function StepModules() {
       >
         <Tabs
           value={tabIndex}
-          onChange={(_, v) => setTabIndex(v)}
+          onChange={handleTabChange}
           variant="scrollable"
           scrollButtons="auto"
           sx={{
@@ -306,11 +353,6 @@ export default function StepModules() {
             icon={<BusinessCenterIcon sx={{ fontSize: 18 }} />}
             iconPosition="start"
             label="Gerencial"
-          />
-          <Tab
-            icon={<TuneIcon sx={{ fontSize: 18 }} />}
-            iconPosition="start"
-            label="Geral"
           />
         </Tabs>
       </Box>
@@ -520,24 +562,6 @@ export default function StepModules() {
             />
           ))}
         </Collapse>
-      </TabPanel>
-
-      {/* ─── Geral ───────────────────────────────── */}
-      <TabPanel value={tabIndex} index={3}>
-        <Typography variant="body2" sx={{ color: 'text.secondary', mb: 2 }}>
-          Funcionalidades compartilhadas entre todos os perfis.
-        </Typography>
-
-        <FeatureToggle
-          feature={{
-            key: 'settings',
-            label: 'Configurações',
-            description: 'Foto de perfil, tema claro/escuro, preferências gerais',
-          }}
-          checked={shared.settings}
-          onChange={toggleSettings}
-          accentColor={accentColor}
-        />
       </TabPanel>
     </Box>
   );
