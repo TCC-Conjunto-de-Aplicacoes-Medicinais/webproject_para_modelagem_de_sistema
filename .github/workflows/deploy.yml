@@ -80,25 +80,25 @@ jobs:
               --restart always \
               --network host \
               -e PORT=8001 \
-              -e DB_HOST=${{ secrets.DB_HOST }} \
-              -e DB_PORT=${{ secrets.DB_PORT }} \
-              -e DB_USER=${{ secrets.DB_USER }} \
-              -e DB_PASSWORD=${{ secrets.DB_PASSWORD }} \
-              -e DB_NAME=${{ secrets.DB_NAME }} \
-              -e DB_CHARSET=${{ secrets.DB_CHARSET }} \
-              -e JWT_SECRET=${{ secrets.JWT_SECRET }} \
-              -e JWT_EXPIRATION_HOURS=${{ secrets.JWT_EXPIRATION_HOURS }} \
-              -e SMTP_HOST=${{ secrets.SMTP_HOST }} \
-              -e SMTP_PORT=${{ secrets.SMTP_PORT }} \
-              -e SMTP_USER=${{ secrets.SMTP_USER }} \
-              -e SMTP_PASSWORD=${{ secrets.SMTP_PASSWORD }} \
-              -e AWS_REGION=${{ secrets.AWS_REGION }} \
-              -e AWS_ACCESS_KEY_ID=${{ secrets.AWS_ACCESS_KEY_ID }} \
-              -e AWS_SECRET_ACCESS_KEY=${{ secrets.AWS_SECRET_ACCESS_KEY }} \
-              -e AWS_SESSION_TOKEN=${{ secrets.AWS_SESSION_TOKEN }} \
-              -e AWS_BUCKET_NAME=${{ secrets.AWS_BUCKET_NAME }} \
-              -e OBJ_KEY=${{ secrets.OBJ_KEY }} \
-              -e GIN_MODE=release \
+              -e DB_HOST="${{ secrets.DB_HOST }}" \
+              -e DB_PORT="${{ secrets.DB_PORT }}" \
+              -e DB_USER="${{ secrets.DB_USER }}" \
+              -e DB_PASSWORD="${{ secrets.DB_PASSWORD }}" \
+              -e DB_NAME="${{ secrets.DB_NAME }}" \
+              -e DB_CHARSET="${{ secrets.DB_CHARSET }}" \
+              -e JWT_SECRET="${{ secrets.JWT_SECRET }}" \
+              -e JWT_EXPIRATION_HOURS="${{ secrets.JWT_EXPIRATION_HOURS }}" \
+              -e SMTP_HOST="${{ secrets.SMTP_HOST }}" \
+              -e SMTP_PORT="${{ secrets.SMTP_PORT }}" \
+              -e SMTP_USER="${{ secrets.SMTP_USER }}" \
+              -e SMTP_PASSWORD="${{ secrets.SMTP_PASSWORD }}" \
+              -e AWS_REGION="${{ secrets.AWS_REGION }}" \
+              -e AWS_ACCESS_KEY_ID="${{ secrets.AWS_ACCESS_KEY_ID }}" \
+              -e AWS_SECRET_ACCESS_KEY="${{ secrets.AWS_SECRET_ACCESS_KEY }}" \
+              -e AWS_SESSION_TOKEN="${{ secrets.AWS_SESSION_TOKEN }}" \
+              -e AWS_BUCKET_NAME="${{ secrets.AWS_BUCKET_NAME }}" \
+              -e OBJ_KEY="${{ secrets.OBJ_KEY }}" \
+              -e GIN_MODE="release" \
               --memory=256m \
               ${{ secrets.DOCKERHUB_USERNAME }}/openhealth-web:latest
 
