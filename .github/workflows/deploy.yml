@@ -68,7 +68,7 @@ jobs:
             echo "${{ secrets.DOCKERHUB_TOKEN }}" | docker login -u "${{ secrets.DOCKERHUB_USERNAME }}" --password-stdin
 
             echo "📦 Baixando imagem mais recente..."
-            docker pull ${{ env.IMAGE_NAME }}:latest
+            docker pull ${{ secrets.DOCKERHUB_USERNAME }}/openhealth-web:latest
 
             echo "🛑 Parando container antigo (se existir)..."
             docker stop openhealth-web 2>/dev/null || true
@@ -100,7 +100,7 @@ jobs:
               -e OBJ_KEY=${{ secrets.OBJ_KEY }} \
               -e GIN_MODE=release \
               --memory=256m \
-              ${{ env.IMAGE_NAME }}:latest
+              ${{ secrets.DOCKERHUB_USERNAME }}/openhealth-web:latest
 
             echo "🧹 Limpando imagens antigas..."
             docker image prune -af --filter "until=168h"
