@@ -2,7 +2,12 @@ package main
 
 import (
 	"log"
-	"openhealth/internal/adapters/handlers/http"
+	"net/http"
+	"os"
+	"path/filepath"
+	"strings"
+
+	httpHandlers "openhealth/internal/adapters/handlers/http"
 	"openhealth/internal/adapters/repositories/mariadb"
 	"openhealth/internal/adapters/repositories/s3"
 	"openhealth/internal/adapters/services/email"
@@ -36,8 +41,8 @@ func main() {
 	projectService := services.NewProjectService(s3Service, clinicRepo, cfg.ObjectVaultKey)
 
 	// 5. Initialize HTTP Handlers
-	authHandler := http.NewAuthHandler(authService)
-	projectHandler := http.NewProjectHandler(projectService)
+	authHandler := httpHandlers.NewAuthHandler(authService)
+	projectHandler := httpHandlers.NewProjectHandler(projectService)
 
 	// 6. Setup Gin Router
 	r := gin.Default()
@@ -51,9 +56,14 @@ func main() {
 		AllowCredentials: true,
 	}))
 
-	// 7. Setup Routes
+	// 7. Setup API Routes
 	api := r.Group("/api/v1")
 	{
+		// Health Check (usado pelo Docker HEALTHCHECK)
+		api.GET("/health", func(c *gin.Context) {
+			c.JSON(http.StatusOK, gin.H{"status": "ok"})
+		})
+
 		// Public Auth Routes
 		auth := api.Group("/auth")
 		{
@@ -64,7 +74,7 @@ func main() {
 
 		// Protected Project Routes
 		projects := api.Group("/projects")
-		projects.Use(http.AuthMiddleware(cfg.JWTSecret))
+		projects.Use(httpHandlers.AuthMiddleware(cfg.JWTSecret))
 		{
 			projects.POST("", projectHandler.CreateProject)
 			projects.GET("", projectHandler.ListProjects)
@@ -72,9 +82,51 @@ func main() {
 		}
 	}
 
-	// 8. Start Server
-	log.Printf("Starting Open Health API on port %s...", cfg.Port)
+	// 8. Servir Arquivos Estáticos do Next.js (front-end)
+	// O diretório ./static contém o output do `next build` (export)
+	staticDir := "./static"
+	r.NoRoute(func(c *gin.Context) {
+		requestPath := c.Request.URL.Path
+
+		// Se a requisição começa com /api, retorna 404 de API
+		if strings.HasPrefix(requestPath, "/api") {
+			c.JSON(http.StatusNotFound, gin.H{"error": "API route not found"})
+			return
+		}
+
+		// Tenta servir o arquivo estático diretamente
+		filePath := filepath.Join(staticDir, requestPath)
+
+		// Se o arquivo existe, serve diretamente (JS, CSS, imagens, etc.)
+		if info, err := os.Stat(filePath); err == nil && !info.IsDir() {
+			c.File(filePath)
+			return
+		}
+
+		// Para rotas do SPA, tenta servir o arquivo .html correspondente
+		// Ex: /about → /about.html
+		htmlPath := filePath + ".html"
+		if _, err := os.Stat(htmlPath); err == nil {
+			c.File(htmlPath)
+			return
+		}
+
+		// Fallback: serve o index.html (SPA routing)
+		indexPath := filepath.Join(staticDir, "index.html")
+		if _, err := os.Stat(indexPath); err == nil {
+			c.File(indexPath)
+			return
+		}
+
+		c.JSON(http.StatusNotFound, gin.H{"error": "Page not found"})
+	})
+
+	// 9. Start Server
+	log.Printf("Starting Open Health on port %s...", cfg.Port)
+	log.Printf("API routes:    /api/v1/*")
+	log.Printf("Static files:  %s", staticDir)
 	if err := r.Run(":" + cfg.Port); err != nil {
 		log.Fatalf("Failed to start server: %v", err)
 	}
 }
+

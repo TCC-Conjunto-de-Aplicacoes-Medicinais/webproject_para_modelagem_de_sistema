@@ -1,0 +1,36 @@
+# Git
+.git
+.gitignore
+
+# Front-end
+front-end/node_modules
+front-end/.next
+front-end/out
+
+# Back-end
+back-end/bin
+back-end/tmp
+back-end/*.exe
+
+# IDEs
+.idea
+.vscode
+*.swp
+*.swo
+
+# Envs
+.env
+.env.*
+!.env.example
+
+# CI/CD
+.github
+
+# Docker
+Dockerfile
+docker-compose*.yml
+.dockerignore
+
+# Docs
+README.md
+*.md
