@@ -90,7 +90,7 @@ jobs:
             cd /opt/openhealth
             MINIO_ROOT_USER="${{ secrets.MINIO_ROOT_USER }}" \
             MINIO_ROOT_PASSWORD="${{ secrets.MINIO_ROOT_PASSWORD }}" \
-            MINIO_BUCKET_NAME="${{ secrets.AWS_BUCKET_NAME }}" \
+            MINIO_BUCKET_NAME="${{ secrets.MINIO_BUCKET_NAME }}" \
             docker compose up -d --remove-orphans
 
             # Conecta o container do MinIO à rede compartilhada
