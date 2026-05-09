@@ -54,6 +54,20 @@ jobs:
     if: github.event_name == 'push' && github.ref == 'refs/heads/main'
 
     steps:
+      - name: Checkout do código
+        uses: actions/checkout@v4
+
+      - name: Copiar docker-compose do MinIO para o servidor
+        uses: appleboy/scp-action@v0.1.7
+        with:
+          host: ${{ secrets.SSH_HOST }}
+          username: ${{ secrets.SSH_USER }}
+          key: ${{ secrets.SSH_KEY }}
+          port: ${{ secrets.SSH_PORT }}
+          source: "back-end/docker-compose.yml"
+          target: "/opt/openhealth"
+          strip_components: 1
+
       - name: Deploy via SSH
         uses: appleboy/ssh-action@v1.0.3
         with:
@@ -67,6 +81,22 @@ jobs:
             echo "🔐 Login no Docker Hub..."
             echo "${{ secrets.DOCKERHUB_TOKEN }}" | docker login -u "${{ secrets.DOCKERHUB_USERNAME }}" --password-stdin
 
+            # ── Rede compartilhada ──────────────────────────────────
+            echo "🌐 Criando rede Docker (se não existir)..."
+            docker network create openhealth-net 2>/dev/null || true
+
+            # ── MinIO via Docker Compose ────────────────────────────
+            echo "📦 Subindo MinIO via docker-compose..."
+            cd /opt/openhealth
+            MINIO_ROOT_USER="${{ secrets.MINIO_ROOT_USER }}" \
+            MINIO_ROOT_PASSWORD="${{ secrets.MINIO_ROOT_PASSWORD }}" \
+            MINIO_BUCKET_NAME="${{ secrets.AWS_BUCKET_NAME }}" \
+            docker compose up -d --remove-orphans
+
+            # Conecta o container do MinIO à rede compartilhada
+            docker network connect openhealth-net openhealth-minio 2>/dev/null || true
+
+            # ── Aplicação principal ─────────────────────────────────
             echo "📦 Baixando imagem mais recente..."
             docker pull ${{ secrets.DOCKERHUB_USERNAME }}/openhealth-web:latest
 
@@ -78,7 +108,9 @@ jobs:
             docker run -d \
               --name openhealth-web \
               --restart always \
-              --network host \
+              --network openhealth-net \
+              --add-host=host.docker.internal:host-gateway \
+              -p 8001:8001 \
               -e PORT=8001 \
               -e DB_HOST="${{ secrets.DB_HOST }}" \
               -e DB_PORT="${{ secrets.DB_PORT }}" \
@@ -93,10 +125,11 @@ jobs:
               -e SMTP_USER="${{ secrets.SMTP_USER }}" \
               -e SMTP_PASSWORD="${{ secrets.SMTP_PASSWORD }}" \
               -e AWS_REGION="${{ secrets.AWS_REGION }}" \
-              -e AWS_ACCESS_KEY_ID="${{ secrets.AWS_ACCESS_KEY_ID }}" \
-              -e AWS_SECRET_ACCESS_KEY="${{ secrets.AWS_SECRET_ACCESS_KEY }}" \
-              -e AWS_SESSION_TOKEN="${{ secrets.AWS_SESSION_TOKEN }}" \
+              -e AWS_ACCESS_KEY_ID="${{ secrets.MINIO_ROOT_USER }}" \
+              -e AWS_SECRET_ACCESS_KEY="${{ secrets.MINIO_ROOT_PASSWORD }}" \
+              -e AWS_SESSION_TOKEN="" \
               -e AWS_BUCKET_NAME="${{ secrets.AWS_BUCKET_NAME }}" \
+              -e S3_ENDPOINT="http://openhealth-minio:9000" \
               -e OBJ_KEY="${{ secrets.OBJ_KEY }}" \
               -e GIN_MODE="release" \
               --memory=256m \
@@ -106,3 +139,4 @@ jobs:
             docker image prune -af --filter "until=168h"
 
             echo "✅ Deploy concluído com sucesso!"
+

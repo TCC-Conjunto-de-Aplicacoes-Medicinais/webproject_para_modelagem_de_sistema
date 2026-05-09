@@ -1,0 +1,47 @@
+services:
+  minio:
+    image: minio/minio:latest
+    container_name: openhealth-minio
+    restart: always
+    ports:
+      - "9000:9000" # API S3
+      - "9001:9001" # Console Web (admin)
+    environment:
+      MINIO_ROOT_USER: ${MINIO_ROOT_USER:-minioadmin}
+      MINIO_ROOT_PASSWORD: ${MINIO_ROOT_PASSWORD:-minioadmin}
+    volumes:
+      - minio_data:/data
+    command: server /data --console-address ":9001"
+    healthcheck:
+      test: [ "CMD", "mc", "ready", "local" ]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+      start_period: 10s
+    deploy:
+      resources:
+        limits:
+          memory: 256M
+
+  # Serviço auxiliar para criar o bucket padrão automaticamente
+  minio-init:
+    image: minio/mc:latest
+    container_name: openhealth-minio-init
+    depends_on:
+      minio:
+        condition: service_healthy
+    deploy:
+      resources:
+        limits:
+          memory: 64M
+    entrypoint: >
+      /bin/sh -c "
+        mc alias set local http://minio:9000 $${MINIO_ROOT_USER:-minioadmin} $${MINIO_ROOT_PASSWORD:-minioadmin};
+        mc mb local/$${MINIO_BUCKET_NAME:-openhealth-bucket} --ignore-existing;
+        mc anonymous set none local/$${MINIO_BUCKET_NAME:-openhealth-bucket};
+        echo 'Bucket criado com sucesso!';
+      "
+
+volumes:
+  minio_data:
+    driver: local
