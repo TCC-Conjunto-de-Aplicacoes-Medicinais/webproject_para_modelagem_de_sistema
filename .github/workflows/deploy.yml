@@ -108,9 +108,7 @@ jobs:
             docker run -d \
               --name openhealth-web \
               --restart always \
-              --network openhealth-net \
-              --add-host=host.docker.internal:host-gateway \
-              -p 8001:8001 \
+              --network host \
               -e PORT=8001 \
               -e DB_HOST="${{ secrets.DB_HOST }}" \
               -e DB_PORT="${{ secrets.DB_PORT }}" \
