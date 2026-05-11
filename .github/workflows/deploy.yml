@@ -88,9 +88,10 @@ jobs:
             # ── MinIO via Docker Compose ────────────────────────────
             echo "📦 Subindo MinIO via docker-compose..."
             cd /opt/openhealth
-            MINIO_ROOT_USER="${{ secrets.MINIO_ROOT_USER }}" \
-            MINIO_ROOT_PASSWORD="${{ secrets.MINIO_ROOT_PASSWORD }}" \
-            MINIO_BUCKET_NAME="${{ secrets.MINIO_BUCKET_NAME }}" \
+            echo "MINIO_ROOT_USER=${{ secrets.MINIO_ROOT_USER }}" > .env
+            echo "MINIO_ROOT_PASSWORD=${{ secrets.MINIO_ROOT_PASSWORD }}" >> .env
+            echo "MINIO_BUCKET_NAME=${{ secrets.MINIO_BUCKET_NAME }}" >> .env
+            
             docker compose up -d --force-recreate --remove-orphans
 
             # Conecta o container do MinIO à rede compartilhada
