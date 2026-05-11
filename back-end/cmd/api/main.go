@@ -9,7 +9,7 @@ import (
 
 	httpHandlers "openhealth/internal/adapters/handlers/http"
 	"openhealth/internal/adapters/repositories/mariadb"
-	"openhealth/internal/adapters/repositories/s3"
+	"openhealth/internal/adapters/repositories/minio"
 	"openhealth/internal/adapters/services/email"
 	"openhealth/internal/core/domain"
 	"openhealth/internal/core/services"
@@ -33,12 +33,12 @@ func main() {
 
 	// 3. Initialize Repositories and External Services
 	clinicRepo := mariadb.NewClinicRepository(db)
-	s3Service := s3.NewS3StorageService(cfg.AWSRegion, cfg.AWSAccessKeyID, cfg.AWSSecretAccessKey, cfg.AWSSessionToken, cfg.AWSBucketName)
+	minioService := minio.NewMinioStorageService(cfg.MinioEndpoint, cfg.MinioAccessKey, cfg.MinioSecretKey, cfg.MinioBucketName, cfg.MinioUseSSL)
 	emailService := email.NewSMTPEmailService(cfg.SMTPHost, cfg.SMTPPort, cfg.SMTPUser, cfg.SMTPPassword)
 
 	// 4. Initialize Core Services (Use Cases)
 	authService := services.NewAuthService(clinicRepo, emailService, cfg.JWTSecret, cfg.JWTExpirationHours)
-	projectService := services.NewProjectService(s3Service, clinicRepo, cfg.ObjectVaultKey)
+	projectService := services.NewProjectService(minioService, clinicRepo, cfg.ObjectVaultKey)
 
 	// 5. Initialize HTTP Handlers
 	authHandler := httpHandlers.NewAuthHandler(authService)

@@ -122,12 +122,11 @@ jobs:
               -e SMTP_PORT="${{ secrets.SMTP_PORT }}" \
               -e SMTP_USER="${{ secrets.SMTP_USER }}" \
               -e SMTP_PASSWORD="${{ secrets.SMTP_PASSWORD }}" \
-              -e AWS_REGION="${{ secrets.AWS_REGION }}" \
-              -e AWS_ACCESS_KEY_ID="${{ secrets.MINIO_ROOT_USER }}" \
-              -e AWS_SECRET_ACCESS_KEY="${{ secrets.MINIO_ROOT_PASSWORD }}" \
-              -e AWS_SESSION_TOKEN="" \
-              -e AWS_BUCKET_NAME="${{ secrets.AWS_BUCKET_NAME }}" \
-              -e S3_ENDPOINT="http://openhealth-minio:9000" \
+              -e MINIO_ENDPOINT="openhealth-minio:9000" \
+              -e MINIO_ACCESS_KEY="${{ secrets.MINIO_ROOT_USER }}" \
+              -e MINIO_SECRET_KEY="${{ secrets.MINIO_ROOT_PASSWORD }}" \
+              -e MINIO_BUCKET_NAME="${{ secrets.MINIO_BUCKET_NAME }}" \
+              -e MINIO_USE_SSL="false" \
               -e OBJ_KEY="${{ secrets.OBJ_KEY }}" \
               -e GIN_MODE="release" \
               --memory=256m \

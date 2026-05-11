@@ -22,11 +22,11 @@ type Config struct {
 	SMTPPort           int
 	SMTPUser           string
 	SMTPPassword       string
-	AWSRegion          string
-	AWSAccessKeyID     string
-	AWSSecretAccessKey string
-	AWSSessionToken    string
-	AWSBucketName      string
+	MinioEndpoint      string
+	MinioAccessKey     string
+	MinioSecretKey     string
+	MinioBucketName    string
+	MinioUseSSL        bool
 	ObjectVaultKey     string
 }
 
@@ -53,11 +53,11 @@ func LoadConfig() *Config {
 		SMTPPort:           smtpPort,
 		SMTPUser:           getEnv("SMTP_USER", ""),
 		SMTPPassword:       getEnv("SMTP_PASSWORD", ""),
-		AWSRegion:          getEnv("AWS_REGION", "us-east-1"),
-		AWSAccessKeyID:     getEnv("AWS_ACCESS_KEY_ID", ""),
-		AWSSecretAccessKey: getEnv("AWS_SECRET_ACCESS_KEY", ""),
-		AWSSessionToken:    getEnv("AWS_SESSION_TOKEN", ""),
-		AWSBucketName:      getEnv("AWS_BUCKET_NAME", ""),
+		MinioEndpoint:      getEnv("MINIO_ENDPOINT", "localhost:9000"),
+		MinioAccessKey:     getEnv("MINIO_ACCESS_KEY", ""),
+		MinioSecretKey:     getEnv("MINIO_SECRET_KEY", ""),
+		MinioBucketName:    getEnv("MINIO_BUCKET_NAME", ""),
+		MinioUseSSL:        getEnv("MINIO_USE_SSL", "false") == "true",
 		ObjectVaultKey:     getEnv("OBJ_KEY", ""),
 	}
 }
