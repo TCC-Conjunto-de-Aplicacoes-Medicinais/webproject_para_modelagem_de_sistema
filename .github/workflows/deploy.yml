@@ -88,6 +88,11 @@ jobs:
             # ── MinIO via Docker Compose ────────────────────────────
             echo "📦 Subindo MinIO via docker-compose..."
             cd /opt/openhealth
+            
+            # Reset geral dos 2 containers do MinIO e do Disco
+            echo "⚠️ Limpando os containers e o disco antigo do MinIO..."
+            docker compose down -v
+            
             echo 'MINIO_ROOT_USER=${{ secrets.MINIO_ROOT_USER }}' > .env
             echo 'MINIO_ROOT_PASSWORD=${{ secrets.MINIO_ROOT_PASSWORD }}' >> .env
             echo 'MINIO_BUCKET_NAME=${{ secrets.MINIO_BUCKET_NAME }}' >> .env
