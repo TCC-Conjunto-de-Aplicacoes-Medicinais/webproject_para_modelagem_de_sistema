@@ -131,7 +131,7 @@ jobs:
               -e SMTP_PORT="${{ secrets.SMTP_PORT }}" \
               -e SMTP_USER="${{ secrets.SMTP_USER }}" \
               -e SMTP_PASSWORD="${{ secrets.SMTP_PASSWORD }}" \
-              -e MINIO_ENDPOINT="openhealth-minio:9000" \
+              -e MINIO_ENDPOINT="127.0.0.1:9000" \
               -e MINIO_ACCESS_KEY="${{ secrets.MINIO_ROOT_USER }}" \
               -e MINIO_SECRET_KEY="${{ secrets.MINIO_ROOT_PASSWORD }}" \
               -e MINIO_BUCKET_NAME="${{ secrets.MINIO_BUCKET_NAME }}" \
