@@ -97,6 +97,9 @@ jobs:
             echo 'MINIO_ROOT_PASSWORD=${{ secrets.MINIO_ROOT_PASSWORD }}' >> .env
             echo 'MINIO_BUCKET_NAME=${{ secrets.MINIO_BUCKET_NAME }}' >> .env
             
+            echo "🔎 CONTEÚDO DO .ENV (As senhas devem aparecer como ***):"
+            cat .env
+            
             docker compose up -d --force-recreate --remove-orphans
 
             # Conecta o container do MinIO à rede compartilhada
