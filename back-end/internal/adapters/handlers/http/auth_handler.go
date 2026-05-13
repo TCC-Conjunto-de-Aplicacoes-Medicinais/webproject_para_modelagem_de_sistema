@@ -39,12 +39,12 @@ func (h *AuthHandler) Register(c *gin.Context) {
 	clinic := &domain.Clinic{
 		CNPJ:            req.CNPJ,
 		Email:           req.Email,
-		NomeResponsavel: req.NomeResponsavel,
+		ResponsibleName: req.NomeResponsavel,
 		Senha:           req.Senha,
-		NomeClinica:     req.NomeClinica,
-		Localizacao:     req.Localizacao,
-		Especialidade:   req.Especialidade,
-		Telefone:        req.Telefone,
+		ClinicName:      req.NomeClinica,
+		Location:        req.Localizacao,
+		Specialty:       req.Especialidade,
+		Phone:           req.Telefone,
 	}
 
 	if err := h.authService.Register(c.Request.Context(), clinic); err != nil {

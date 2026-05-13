@@ -28,6 +28,10 @@ type Config struct {
 	MinioBucketName    string
 	MinioUseSSL        bool
 	ObjectVaultKey     string
+	KeycloakURL        string
+	KeycloakRealm      string
+	KeycloakClientID   string
+	KeycloakClientSecret string
 }
 
 func LoadConfig() *Config {
@@ -59,6 +63,10 @@ func LoadConfig() *Config {
 		MinioBucketName:    getEnv("MINIO_BUCKET_NAME", ""),
 		MinioUseSSL:        getEnv("MINIO_USE_SSL", "false") == "true",
 		ObjectVaultKey:     getEnv("OBJ_KEY", ""),
+		KeycloakURL:        getEnv("KEYCLOAK_URL", "http://localhost:8080"),
+		KeycloakRealm:      getEnv("KEYCLOAK_REALM", "openhealth"),
+		KeycloakClientID:   getEnv("KEYCLOAK_CLIENT_ID", "openhealth-api"),
+		KeycloakClientSecret: getEnv("KEYCLOAK_CLIENT_SECRET", ""),
 	}
 }
 

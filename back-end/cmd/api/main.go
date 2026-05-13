@@ -18,6 +18,7 @@ import (
 
 	"github.com/gin-contrib/cors"
 	"github.com/gin-gonic/gin"
+	"github.com/Nerzal/gocloak/v13"
 )
 
 func main() {
@@ -37,7 +38,17 @@ func main() {
 	emailService := email.NewSMTPEmailService(cfg.SMTPHost, cfg.SMTPPort, cfg.SMTPUser, cfg.SMTPPassword)
 
 	// 4. Initialize Core Services (Use Cases)
-	authService := services.NewAuthService(clinicRepo, emailService, cfg.JWTSecret, cfg.JWTExpirationHours)
+	kcClient := gocloak.NewClient(cfg.KeycloakURL)
+	authService := services.NewAuthService(
+		clinicRepo,
+		emailService,
+		cfg.JWTSecret,
+		cfg.JWTExpirationHours,
+		kcClient,
+		cfg.KeycloakClientID,
+		cfg.KeycloakClientSecret,
+		cfg.KeycloakRealm,
+	)
 	projectService := services.NewProjectService(minioService, clinicRepo, cfg.ObjectVaultKey)
 
 	// 5. Initialize HTTP Handlers

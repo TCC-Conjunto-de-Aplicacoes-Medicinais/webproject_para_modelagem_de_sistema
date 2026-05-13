@@ -9,26 +9,45 @@ import (
 	"openhealth/internal/core/ports"
 	"openhealth/pkg/utils"
 	"time"
+
+	"github.com/Nerzal/gocloak/v13"
 )
 
 type AuthService struct {
-	clinicRepo      ports.ClinicRepository
-	emailService    ports.EmailService
-	jwtSecret       string
-	jwtExpHours     int
+	clinicRepo     ports.ClinicRepository
+	emailService   ports.EmailService
+	jwtSecret      string
+	jwtExpHours    int
+	kcClient       *gocloak.GoCloak
+	kcClientID     string
+	kcClientSecret string
+	kcRealm        string
 }
 
-func NewAuthService(clinicRepo ports.ClinicRepository, emailService ports.EmailService, jwtSecret string, jwtExpHours int) *AuthService {
+func NewAuthService(
+	clinicRepo ports.ClinicRepository,
+	emailService ports.EmailService,
+	jwtSecret string,
+	jwtExpHours int,
+	kcClient *gocloak.GoCloak,
+	kcClientID string,
+	kcClientSecret string,
+	kcRealm string,
+) *AuthService {
 	return &AuthService{
-		clinicRepo:      clinicRepo,
-		emailService:    emailService,
-		jwtSecret:       jwtSecret,
-		jwtExpHours:     jwtExpHours,
+		clinicRepo:     clinicRepo,
+		emailService:   emailService,
+		jwtSecret:      jwtSecret,
+		jwtExpHours:    jwtExpHours,
+		kcClient:       kcClient,
+		kcClientID:     kcClientID,
+		kcClientSecret: kcClientSecret,
+		kcRealm:        kcRealm,
 	}
 }
 
 func (s *AuthService) Register(ctx context.Context, clinic *domain.Clinic) error {
-	// Check if email exists
+	// Check if email exists in local DB
 	existingEmail, err := s.clinicRepo.FindByEmail(ctx, clinic.Email)
 	if err != nil {
 		return err
@@ -37,7 +56,7 @@ func (s *AuthService) Register(ctx context.Context, clinic *domain.Clinic) error
 		return errors.New("email already in use")
 	}
 
-	// Check if CNPJ exists
+	// Check if CNPJ exists in local DB
 	existingCNPJ, err := s.clinicRepo.FindByCNPJ(ctx, clinic.CNPJ)
 	if err != nil {
 		return err
@@ -46,21 +65,50 @@ func (s *AuthService) Register(ctx context.Context, clinic *domain.Clinic) error
 		return errors.New("CNPJ already in use")
 	}
 
-	// Hash password
-	hashedPassword, err := utils.HashPassword(clinic.Senha)
+	// 1. Keycloak Integration: Login as client to get admin token
+	token, err := s.kcClient.LoginClient(ctx, s.kcClientID, s.kcClientSecret, s.kcRealm)
 	if err != nil {
-		return fmt.Errorf("failed to hash password: %v", err)
+		return fmt.Errorf("failed to authenticate with Keycloak: %v", err)
 	}
-	clinic.Senha = hashedPassword
 
-	// Generate verification code
+	// 2. Prepare Keycloak User
+	enabled := true
+	keycloakUser := gocloak.User{
+		Username:      gocloak.StringP(clinic.Email),
+		Email:         gocloak.StringP(clinic.Email),
+		FirstName:     gocloak.StringP(clinic.ClinicName),
+		Enabled:       &enabled,
+		EmailVerified: gocloak.BoolP(true), // Assuming clinics are verified or handled via code below
+		Attributes: &map[string][]string{
+			"tipo_usuario": {"clinica"},
+		},
+	}
+
+	// 3. Create User in Keycloak
+	keycloakID, err := s.kcClient.CreateUser(ctx, token.AccessToken, s.kcRealm, keycloakUser)
+	if err != nil {
+		return fmt.Errorf("failed to create user in Keycloak: %v", err)
+	}
+	clinic.KeycloakID = &keycloakID
+
+	// 4. Set Password in Keycloak
+	err = s.kcClient.SetPassword(ctx, token.AccessToken, keycloakID, s.kcRealm, clinic.Senha, false)
+	if err != nil {
+		// Rollback Keycloak user creation if password setting fails
+		_ = s.kcClient.DeleteUser(ctx, token.AccessToken, s.kcRealm, keycloakID)
+		return fmt.Errorf("failed to set password in Keycloak: %v", err)
+	}
+
+	// 5. Generate verification code for local logic (if still needed)
 	code := fmt.Sprintf("%06d", rand.New(rand.NewSource(time.Now().UnixNano())).Intn(1000000))
 	clinic.VerificationCode = code
 	clinic.Verify = false
 
-	// Save to DB
+	// 6. Save to DB
 	if err := s.clinicRepo.Save(ctx, clinic); err != nil {
-		return err
+		// Rollback: delete user from Keycloak if DB save fails
+		_ = s.kcClient.DeleteUser(ctx, token.AccessToken, s.kcRealm, keycloakID)
+		return fmt.Errorf("failed to save clinic to database: %v", err)
 	}
 
 	// Send verification code
@@ -94,26 +142,33 @@ func (s *AuthService) VerifyCode(ctx context.Context, email, code string) error 
 }
 
 func (s *AuthService) Login(ctx context.Context, email, password string) (string, error) {
+	// 1. Authenticate with Keycloak
+	_, err := s.kcClient.Login(ctx, s.kcClientID, s.kcClientSecret, s.kcRealm, email, password)
+	if err != nil {
+		return "", errors.New("invalid credentials")
+	}
+
+	// 2. Fetch clinic info from local DB to check verification status and get ID
 	clinic, err := s.clinicRepo.FindByEmail(ctx, email)
 	if err != nil {
 		return "", err
 	}
 	if clinic == nil {
-		return "", errors.New("invalid credentials")
+		// This should not happen if Keycloak auth succeeded, but good to check
+		return "", errors.New("clinic not found in local database")
 	}
 
-	if !utils.CheckPasswordHash(password, clinic.Senha) {
-		return "", errors.New("invalid credentials")
-	}
-
-	token, err := utils.GenerateJWT(clinic.ID, s.jwtSecret, s.jwtExpHours)
+	// Generate internal JWT if needed, or just use Keycloak token
+	// The current logic generates a custom JWT. Let's stick to it or use Keycloak's.
+	// Based on the existing code, it returns a custom JWT.
+	jwtToken, err := utils.GenerateJWT(clinic.ID, s.jwtSecret, s.jwtExpHours)
 	if err != nil {
 		return "", fmt.Errorf("failed to generate token: %v", err)
 	}
 
 	if !clinic.Verify {
-		return token, errors.New("unverified_account")
+		return jwtToken, errors.New("unverified_account")
 	}
 
-	return token, nil
+	return jwtToken, nil
 }
