@@ -67,17 +67,17 @@ func (h *AuthHandler) Login(c *gin.Context) {
 		return
 	}
 
-	token, err := h.authService.Login(c.Request.Context(), req.Email, req.Senha)
+	resp, err := h.authService.Login(c.Request.Context(), req.Email, req.Senha)
 	if err != nil {
 		if err.Error() == "unverified_account" {
-			c.JSON(http.StatusForbidden, gin.H{"error": "unverified_account", "token": token})
+			c.JSON(http.StatusForbidden, gin.H{"error": "unverified_account", "data": resp})
 			return
 		}
 		c.JSON(http.StatusUnauthorized, gin.H{"error": err.Error()})
 		return
 	}
 
-	c.JSON(http.StatusOK, gin.H{"token": token})
+	c.JSON(http.StatusOK, resp)
 }
 
 type VerifyRequest struct {

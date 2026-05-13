@@ -7,7 +7,6 @@ import (
 	"math/rand"
 	"openhealth/internal/core/domain"
 	"openhealth/internal/core/ports"
-	"openhealth/pkg/utils"
 	"time"
 
 	"github.com/Nerzal/gocloak/v13"
@@ -141,34 +140,40 @@ func (s *AuthService) VerifyCode(ctx context.Context, email, code string) error 
 	return s.clinicRepo.Save(ctx, clinic)
 }
 
-func (s *AuthService) Login(ctx context.Context, email, password string) (string, error) {
+type LoginResponse struct {
+	AccessToken  string `json:"access_token"`
+	RefreshToken string `json:"refresh_token"`
+	ExpiresIn    int    `json:"expires_in"`
+	TokenType    string `json:"token_type"`
+	InternalID   string `json:"internal_id"` // This is the clinic.ID (tenant_id)
+}
+
+func (s *AuthService) Login(ctx context.Context, email, password string) (*LoginResponse, error) {
 	// 1. Authenticate with Keycloak
-	_, err := s.kcClient.Login(ctx, s.kcClientID, s.kcClientSecret, s.kcRealm, email, password)
+	token, err := s.kcClient.Login(ctx, s.kcClientID, s.kcClientSecret, s.kcRealm, email, password)
 	if err != nil {
-		return "", errors.New("invalid credentials")
+		return nil, errors.New("invalid credentials")
 	}
 
 	// 2. Fetch clinic info from local DB to check verification status and get ID
 	clinic, err := s.clinicRepo.FindByEmail(ctx, email)
 	if err != nil {
-		return "", err
+		return nil, err
 	}
 	if clinic == nil {
 		// This should not happen if Keycloak auth succeeded, but good to check
-		return "", errors.New("clinic not found in local database")
-	}
-
-	// Generate internal JWT if needed, or just use Keycloak token
-	// The current logic generates a custom JWT. Let's stick to it or use Keycloak's.
-	// Based on the existing code, it returns a custom JWT.
-	jwtToken, err := utils.GenerateJWT(clinic.ID, s.jwtSecret, s.jwtExpHours)
-	if err != nil {
-		return "", fmt.Errorf("failed to generate token: %v", err)
+		return nil, errors.New("clinic not found in local database")
 	}
 
 	if !clinic.Verify {
-		return jwtToken, errors.New("unverified_account")
+		return nil, errors.New("unverified_account")
 	}
 
-	return jwtToken, nil
+	return &LoginResponse{
+		AccessToken:  token.AccessToken,
+		RefreshToken: token.RefreshToken,
+		ExpiresIn:    token.ExpiresIn,
+		TokenType:    token.TokenType,
+		InternalID:   clinic.ID,
+	}, nil
 }
