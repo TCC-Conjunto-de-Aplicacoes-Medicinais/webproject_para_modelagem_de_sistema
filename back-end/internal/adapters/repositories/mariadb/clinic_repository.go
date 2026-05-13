@@ -2,10 +2,10 @@ package mariadb
 
 import (
 	"context"
-	"errors"
 	"openhealth/internal/core/domain"
 	"openhealth/internal/core/ports"
 
+	"github.com/google/uuid"
 	"gorm.io/gorm"
 )
 
@@ -18,6 +18,9 @@ func NewClinicRepository(db *gorm.DB) ports.ClinicRepository {
 }
 
 func (r *clinicRepository) Save(ctx context.Context, clinic *domain.Clinic) error {
+	if clinic.ID == "" {
+		clinic.ID = uuid.New().String()
+	}
 	query := `
 		INSERT INTO clinic (
 			id, cnpj, email, responsible_name, clinic_name, location, specialty, phone, 
@@ -59,40 +62,44 @@ func (r *clinicRepository) Save(ctx context.Context, clinic *domain.Clinic) erro
 
 func (r *clinicRepository) FindByEmail(ctx context.Context, email string) (*domain.Clinic, error) {
 	var clinic domain.Clinic
-	err := r.db.WithContext(ctx).Where("email = ?", email).First(&clinic).Error
-	if err != nil {
-		if errors.Is(err, gorm.ErrRecordNotFound) {
-			return nil, nil
-		}
-		return nil, err
+	query := "SELECT * FROM clinic WHERE email = ? LIMIT 1"
+	result := r.db.WithContext(ctx).Raw(query, email).Scan(&clinic)
+	if result.Error != nil {
+		return nil, result.Error
+	}
+	if result.RowsAffected == 0 {
+		return nil, nil
 	}
 	return &clinic, nil
 }
 
 func (r *clinicRepository) FindByCNPJ(ctx context.Context, cnpj string) (*domain.Clinic, error) {
 	var clinic domain.Clinic
-	err := r.db.WithContext(ctx).Where("cnpj = ?", cnpj).First(&clinic).Error
-	if err != nil {
-		if errors.Is(err, gorm.ErrRecordNotFound) {
-			return nil, nil
-		}
-		return nil, err
+	query := "SELECT * FROM clinic WHERE cnpj = ? LIMIT 1"
+	result := r.db.WithContext(ctx).Raw(query, cnpj).Scan(&clinic)
+	if result.Error != nil {
+		return nil, result.Error
+	}
+	if result.RowsAffected == 0 {
+		return nil, nil
 	}
 	return &clinic, nil
 }
 
 func (r *clinicRepository) FindByID(ctx context.Context, id string) (*domain.Clinic, error) {
 	var clinic domain.Clinic
-	err := r.db.WithContext(ctx).Where("id = ?", id).First(&clinic).Error
-	if err != nil {
-		if errors.Is(err, gorm.ErrRecordNotFound) {
-			return nil, nil
-		}
-		return nil, err
+	query := "SELECT * FROM clinic WHERE id = ? LIMIT 1"
+	result := r.db.WithContext(ctx).Raw(query, id).Scan(&clinic)
+	if result.Error != nil {
+		return nil, result.Error
+	}
+	if result.RowsAffected == 0 {
+		return nil, nil
 	}
 	return &clinic, nil
 }
 
 func (r *clinicRepository) UpdateBucketRef(ctx context.Context, id string, bucketRef string) error {
-	return r.db.WithContext(ctx).Model(&domain.Clinic{}).Where("id = ?", id).Update("bucket_obj", bucketRef).Error
+	query := "UPDATE clinic SET bucket_obj = ? WHERE id = ?"
+	return r.db.WithContext(ctx).Exec(query, bucketRef, id).Error
 }

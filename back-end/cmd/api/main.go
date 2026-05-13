@@ -11,26 +11,21 @@ import (
 	"openhealth/internal/adapters/repositories/mariadb"
 	"openhealth/internal/adapters/repositories/minio"
 	"openhealth/internal/adapters/services/email"
-	"openhealth/internal/core/domain"
 	"openhealth/internal/core/services"
 	"openhealth/pkg/config"
 	"openhealth/pkg/database"
 
+	"github.com/Nerzal/gocloak/v13"
 	"github.com/gin-contrib/cors"
 	"github.com/gin-gonic/gin"
-	"github.com/Nerzal/gocloak/v13"
 )
 
 func main() {
 	// 1. Load config
 	cfg := config.LoadConfig()
 
-	// 2. Connect DB & Run Migrations
+	// 2. Connect DB
 	db := database.ConnectMariaDB(cfg)
-
-	if err := db.AutoMigrate(&domain.Clinic{}); err != nil {
-		log.Fatalf("Failed to migrate database: %v", err)
-	}
 
 	// 3. Initialize Repositories and External Services
 	clinicRepo := mariadb.NewClinicRepository(db)
@@ -95,13 +90,13 @@ func main() {
 
 	// 8. Servir Arquivos Estáticos do Next.js (front-end)
 	staticDir := "./static"
-	
+
 	// Serve a pasta _next diretamente com alta performance (sem passar pelo fallback)
 	r.Static("/_next", filepath.Join(staticDir, "_next"))
 
 	// Serve arquivos estáticos da raiz (como favicon, robos.txt, imagens)
 	// r.Static("/assets", filepath.Join(staticDir, "assets")) // caso tenha
-	
+
 	r.NoRoute(func(c *gin.Context) {
 		requestPath := c.Request.URL.Path
 
@@ -148,4 +143,3 @@ func main() {
 		log.Fatalf("Failed to start server: %v", err)
 	}
 }
-
