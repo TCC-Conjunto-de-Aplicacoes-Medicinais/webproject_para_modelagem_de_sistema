@@ -33,16 +33,19 @@ func main() {
 	emailService := email.NewSMTPEmailService(cfg.SMTPHost, cfg.SMTPPort, cfg.SMTPUser, cfg.SMTPPassword)
 
 	// 4. Initialize Core Services (Use Cases)
-	kcClient := gocloak.NewClient(cfg.KeycloakURL)
+	kcAuth := &services.KeycloakAuth{
+		Client:       gocloak.NewClient(cfg.KeycloakURL),
+		ClientID:     cfg.KeycloakClientID,
+		ClientSecret: cfg.KeycloakClientSecret,
+		Realm:        cfg.KeycloakRealm,
+	}
+
 	authService := services.NewAuthService(
 		clinicRepo,
 		emailService,
 		cfg.JWTSecret,
 		cfg.JWTExpirationHours,
-		kcClient,
-		cfg.KeycloakClientID,
-		cfg.KeycloakClientSecret,
-		cfg.KeycloakRealm,
+		kcAuth,
 	)
 	projectService := services.NewProjectService(minioService, clinicRepo, cfg.ObjectVaultKey)
 

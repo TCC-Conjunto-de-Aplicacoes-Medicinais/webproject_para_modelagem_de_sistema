@@ -12,15 +12,19 @@ import (
 	"github.com/Nerzal/gocloak/v13"
 )
 
+type KeycloakAuth struct {
+	Client       *gocloak.GoCloak
+	ClientID     string
+	ClientSecret string
+	Realm        string
+}
+
 type AuthService struct {
-	clinicRepo     ports.ClinicRepository
-	emailService   ports.EmailService
-	jwtSecret      string
-	jwtExpHours    int
-	kcClient       *gocloak.GoCloak
-	kcClientID     string
-	kcClientSecret string
-	kcRealm        string
+	clinicRepo   ports.ClinicRepository
+	emailService ports.EmailService
+	jwtSecret    string
+	jwtExpHours  int
+	Keycloak     *KeycloakAuth
 }
 
 func NewAuthService(
@@ -28,20 +32,14 @@ func NewAuthService(
 	emailService ports.EmailService,
 	jwtSecret string,
 	jwtExpHours int,
-	kcClient *gocloak.GoCloak,
-	kcClientID string,
-	kcClientSecret string,
-	kcRealm string,
+	keycloak *KeycloakAuth,
 ) *AuthService {
 	return &AuthService{
-		clinicRepo:     clinicRepo,
-		emailService:   emailService,
-		jwtSecret:      jwtSecret,
-		jwtExpHours:    jwtExpHours,
-		kcClient:       kcClient,
-		kcClientID:     kcClientID,
-		kcClientSecret: kcClientSecret,
-		kcRealm:        kcRealm,
+		clinicRepo:   clinicRepo,
+		emailService: emailService,
+		jwtSecret:    jwtSecret,
+		jwtExpHours:  jwtExpHours,
+		Keycloak:     keycloak,
 	}
 }
 
@@ -65,7 +63,7 @@ func (s *AuthService) Register(ctx context.Context, clinic *domain.Clinic) error
 	}
 
 	// 1. Keycloak Integration: Login as client to get admin token
-	token, err := s.kcClient.LoginClient(ctx, s.kcClientID, s.kcClientSecret, s.kcRealm)
+	token, err := s.Keycloak.Client.LoginClient(ctx, s.Keycloak.ClientID, s.Keycloak.ClientSecret, s.Keycloak.Realm)
 	if err != nil {
 		return fmt.Errorf("failed to authenticate with Keycloak: %v", err)
 	}
@@ -84,17 +82,17 @@ func (s *AuthService) Register(ctx context.Context, clinic *domain.Clinic) error
 	}
 
 	// 3. Create User in Keycloak
-	keycloakID, err := s.kcClient.CreateUser(ctx, token.AccessToken, s.kcRealm, keycloakUser)
+	keycloakID, err := s.Keycloak.Client.CreateUser(ctx, token.AccessToken, s.Keycloak.Realm, keycloakUser)
 	if err != nil {
 		return fmt.Errorf("failed to create user in Keycloak: %v", err)
 	}
 	clinic.KeycloakID = &keycloakID
 
 	// 4. Set Password in Keycloak
-	err = s.kcClient.SetPassword(ctx, token.AccessToken, keycloakID, s.kcRealm, clinic.Senha, false)
+	err = s.Keycloak.Client.SetPassword(ctx, token.AccessToken, keycloakID, s.Keycloak.Realm, clinic.Senha, false)
 	if err != nil {
 		// Rollback Keycloak user creation if password setting fails
-		_ = s.kcClient.DeleteUser(ctx, token.AccessToken, s.kcRealm, keycloakID)
+		_ = s.Keycloak.Client.DeleteUser(ctx, token.AccessToken, s.Keycloak.Realm, keycloakID)
 		return fmt.Errorf("failed to set password in Keycloak: %v", err)
 	}
 
@@ -106,7 +104,7 @@ func (s *AuthService) Register(ctx context.Context, clinic *domain.Clinic) error
 	// 6. Save to DB
 	if err := s.clinicRepo.Save(ctx, clinic); err != nil {
 		// Rollback: delete user from Keycloak if DB save fails
-		_ = s.kcClient.DeleteUser(ctx, token.AccessToken, s.kcRealm, keycloakID)
+		_ = s.Keycloak.Client.DeleteUser(ctx, token.AccessToken, s.Keycloak.Realm, keycloakID)
 		return fmt.Errorf("failed to save clinic to database: %v", err)
 	}
 
@@ -150,7 +148,7 @@ type LoginResponse struct {
 
 func (s *AuthService) Login(ctx context.Context, email, password string) (*LoginResponse, error) {
 	// 1. Authenticate with Keycloak
-	token, err := s.kcClient.Login(ctx, s.kcClientID, s.kcClientSecret, s.kcRealm, email, password)
+	token, err := s.Keycloak.Client.Login(ctx, s.Keycloak.ClientID, s.Keycloak.ClientSecret, s.Keycloak.Realm, email, password)
 	if err != nil {
 		return nil, errors.New("invalid credentials")
 	}
