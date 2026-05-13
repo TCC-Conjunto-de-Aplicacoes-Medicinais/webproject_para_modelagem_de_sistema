@@ -99,6 +99,19 @@ func (r *clinicRepository) FindByID(ctx context.Context, id string) (*domain.Cli
 	return &clinic, nil
 }
 
+func (r *clinicRepository) FindByKeycloakID(ctx context.Context, keycloakID string) (*domain.Clinic, error) {
+	var clinic domain.Clinic
+	query := "SELECT * FROM clinic WHERE keycloak_id = ? LIMIT 1"
+	result := r.db.WithContext(ctx).Raw(query, keycloakID).Scan(&clinic)
+	if result.Error != nil {
+		return nil, result.Error
+	}
+	if result.RowsAffected == 0 {
+		return nil, nil
+	}
+	return &clinic, nil
+}
+
 func (r *clinicRepository) UpdateBucketRef(ctx context.Context, id string, bucketRef string) error {
 	query := "UPDATE clinic SET bucket_obj = ? WHERE id = ?"
 	return r.db.WithContext(ctx).Exec(query, bucketRef, id).Error

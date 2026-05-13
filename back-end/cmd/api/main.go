@@ -83,7 +83,7 @@ func main() {
 
 		// Protected Project Routes
 		projects := api.Group("/projects")
-		projects.Use(httpHandlers.AuthMiddleware(cfg.JWTSecret))
+		projects.Use(httpHandlers.AuthMiddleware(clinicRepo))
 		{
 			projects.POST("", projectHandler.CreateProject)
 			projects.GET("", projectHandler.ListProjects)

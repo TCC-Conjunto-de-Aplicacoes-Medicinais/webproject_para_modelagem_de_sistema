@@ -11,6 +11,7 @@ type ClinicRepository interface {
 	FindByEmail(ctx context.Context, email string) (*domain.Clinic, error)
 	FindByCNPJ(ctx context.Context, cnpj string) (*domain.Clinic, error)
 	FindByID(ctx context.Context, id string) (*domain.Clinic, error)
+	FindByKeycloakID(ctx context.Context, keycloakID string) (*domain.Clinic, error)
 	UpdateBucketRef(ctx context.Context, id string, bucketRef string) error
 }
 
