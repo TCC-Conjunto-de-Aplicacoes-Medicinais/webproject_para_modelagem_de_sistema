@@ -19,7 +19,7 @@ func NewClinicRepository(db *gorm.DB) ports.ClinicRepository {
 
 func (r *clinicRepository) Save(ctx context.Context, clinic *domain.Clinic) error {
 	query := `
-		INSERT INTO clinics (
+		INSERT INTO clinic (
 			id, cnpj, email, responsible_name, clinic_name, location, specialty, phone, 
 			bucket_obj, verify, verification_code, created_at, updated_at, deleted_at, keycloak_id
 		) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
