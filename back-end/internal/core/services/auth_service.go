@@ -183,20 +183,48 @@ func (s *AuthService) Login(ctx context.Context, email, password string) (*Login
 
 			// 1. Get Admin Token
 			adminToken, adminErr := s.Keycloak.Client.LoginClient(ctx, s.Keycloak.ClientID, s.Keycloak.ClientSecret, s.Keycloak.Realm)
-			if adminErr == nil {
+			if adminErr != nil {
+				s.Logger.Log(logger.LogEntry{
+					OriginService: "auth",
+					ActionType:    "login_fix_error",
+					Description:   fmt.Sprintf("Failed to get admin token to fix account: %v", adminErr),
+					ResultStatus:  "error",
+				})
+			} else {
 				// 2. Get User ID
 				users, userErr := s.Keycloak.Client.GetUsers(ctx, adminToken.AccessToken, s.Keycloak.Realm, gocloak.GetUsersParams{
 					Email: gocloak.StringP(email),
 				})
-				if userErr == nil && len(users) > 0 {
+				if userErr != nil || len(users) == 0 {
+					s.Logger.Log(logger.LogEntry{
+						OriginService: "auth",
+						ActionType:    "login_fix_error",
+						Description:   fmt.Sprintf("Failed to find user by email %s: %v", email, userErr),
+						ResultStatus:  "error",
+					})
+				} else {
 					// 3. Clear Required Actions and Ensure Email is Verified
 					users[0].RequiredActions = &[]string{}
 					users[0].EmailVerified = gocloak.BoolP(true)
 
-					_ = s.Keycloak.Client.UpdateUser(ctx, adminToken.AccessToken, s.Keycloak.Realm, *users[0])
-
-					// 4. Retry Login
-					token, err = s.Keycloak.Client.Login(ctx, s.Keycloak.ClientID, s.Keycloak.ClientSecret, s.Keycloak.Realm, email, password)
+					updateErr := s.Keycloak.Client.UpdateUser(ctx, adminToken.AccessToken, s.Keycloak.Realm, *users[0])
+					if updateErr != nil {
+						s.Logger.Log(logger.LogEntry{
+							OriginService: "auth",
+							ActionType:    "login_fix_error",
+							Description:   fmt.Sprintf("Failed to update user %s: %v", email, updateErr),
+							ResultStatus:  "error",
+						})
+					} else {
+						s.Logger.Log(logger.LogEntry{
+							OriginService: "auth",
+							ActionType:    "login_fix_success",
+							Description:   fmt.Sprintf("Successfully updated user %s, retrying login", email),
+							ResultStatus:  "success",
+						})
+						// 4. Retry Login
+						token, err = s.Keycloak.Client.Login(ctx, s.Keycloak.ClientID, s.Keycloak.ClientSecret, s.Keycloak.Realm, email, password)
+					}
 				}
 			}
 		}
