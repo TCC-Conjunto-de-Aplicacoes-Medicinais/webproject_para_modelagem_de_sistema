@@ -10,6 +10,8 @@ import (
 	"openhealth/pkg/logger"
 	"time"
 
+	"strings"
+
 	"github.com/Nerzal/gocloak/v13"
 )
 
@@ -83,6 +85,7 @@ func (s *AuthService) Register(ctx context.Context, clinic *domain.Clinic) error
 		Attributes: &map[string][]string{
 			"tipo_usuario": {"clinica"},
 		},
+		RequiredActions: &[]string{},
 	}
 
 	// 3. Create User in Keycloak
@@ -162,20 +165,51 @@ type LoginResponse struct {
 	RefreshToken string `json:"refresh_token"`
 	ExpiresIn    int    `json:"expires_in"`
 	TokenType    string `json:"token_type"`
-	InternalID   string `json:"internal_id"` // This is the clinic.ID (tenant_id)
+	InternalID   string `json:"internal_id"`
 }
 
 func (s *AuthService) Login(ctx context.Context, email, password string) (*LoginResponse, error) {
 	// 1. Authenticate with Keycloak
 	token, err := s.Keycloak.Client.Login(ctx, s.Keycloak.ClientID, s.Keycloak.ClientSecret, s.Keycloak.Realm, email, password)
 	if err != nil {
-		s.Logger.Log(logger.LogEntry{
-			OriginService: "auth",
-			ActionType:    "login_keycloak",
-			Description:   fmt.Sprintf("Keycloak login failed for %s: %v", email, err),
-			ResultStatus:  "error",
-		})
-		return nil, errors.New("credenciais inválidas")
+		// Handle "Account is not fully set up" (Required Actions pending)
+		if strings.Contains(err.Error(), "Account is not fully set up") {
+			s.Logger.Log(logger.LogEntry{
+				OriginService: "auth",
+				ActionType:    "login_fix",
+				Description:   fmt.Sprintf("Attempting to fix partially set up account for %s", email),
+				ResultStatus:  "info",
+			})
+
+			// 1. Get Admin Token
+			adminToken, adminErr := s.Keycloak.Client.LoginClient(ctx, s.Keycloak.ClientID, s.Keycloak.ClientSecret, s.Keycloak.Realm)
+			if adminErr == nil {
+				// 2. Get User ID
+				users, userErr := s.Keycloak.Client.GetUsers(ctx, adminToken.AccessToken, s.Keycloak.Realm, gocloak.GetUsersParams{
+					Email: gocloak.StringP(email),
+				})
+				if userErr == nil && len(users) > 0 {
+					// 3. Clear Required Actions and Ensure Email is Verified
+					users[0].RequiredActions = &[]string{}
+					users[0].EmailVerified = gocloak.BoolP(true)
+
+					_ = s.Keycloak.Client.UpdateUser(ctx, adminToken.AccessToken, s.Keycloak.Realm, *users[0])
+
+					// 4. Retry Login
+					token, err = s.Keycloak.Client.Login(ctx, s.Keycloak.ClientID, s.Keycloak.ClientSecret, s.Keycloak.Realm, email, password)
+				}
+			}
+		}
+
+		if err != nil {
+			s.Logger.Log(logger.LogEntry{
+				OriginService: "auth",
+				ActionType:    "login_keycloak",
+				Description:   fmt.Sprintf("Keycloak login failed for %s: %v", email, err),
+				ResultStatus:  "error",
+			})
+			return nil, errors.New("credenciais inválidas")
+		}
 	}
 
 	// 2. Fetch clinic info from local DB to check verification status and get ID
@@ -199,4 +233,3 @@ func (s *AuthService) Login(ctx context.Context, email, password string) (*Login
 		InternalID:   clinic.ID,
 	}, nil
 }
-
