@@ -22,4 +22,3 @@ type Clinic struct {
 	DeletedAt        time.Time `json:"deleted_at"`
 	KeycloakID       *string   `json:"keycloak_id,omitempty"`
 }
-

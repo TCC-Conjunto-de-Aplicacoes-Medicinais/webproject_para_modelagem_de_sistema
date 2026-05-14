@@ -166,4 +166,3 @@ func (h *AuthHandler) Verify(c *gin.Context) {
 	})
 	c.JSON(http.StatusOK, gin.H{"message": "Conta verificada com sucesso!"})
 }
-
