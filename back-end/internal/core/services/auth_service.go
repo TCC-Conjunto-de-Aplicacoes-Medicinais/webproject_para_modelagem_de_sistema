@@ -10,8 +10,6 @@ import (
 	"openhealth/pkg/logger"
 	"time"
 
-	"strings"
-
 	"github.com/Nerzal/gocloak/v13"
 )
 
@@ -56,7 +54,7 @@ func (s *AuthService) Register(ctx context.Context, clinic *domain.Clinic) error
 		return err
 	}
 	if existingEmail != nil {
-		return errors.New("email already in use")
+		return errors.New("email já cadastrado")
 	}
 
 	// Check if CNPJ exists in local DB
@@ -65,13 +63,13 @@ func (s *AuthService) Register(ctx context.Context, clinic *domain.Clinic) error
 		return err
 	}
 	if existingCNPJ != nil {
-		return errors.New("CNPJ already in use")
+		return errors.New("CNPJ já cadastrado")
 	}
 
 	// 1. Keycloak Integration: Login as client to get admin token
 	token, err := s.Keycloak.Client.LoginClient(ctx, s.Keycloak.ClientID, s.Keycloak.ClientSecret, s.Keycloak.Realm)
 	if err != nil {
-		return fmt.Errorf("failed to authenticate with Keycloak: %v", err)
+		return fmt.Errorf("erro ao autenticar no Keycloak: %v", err)
 	}
 
 	// 2. Prepare Keycloak User
@@ -80,12 +78,12 @@ func (s *AuthService) Register(ctx context.Context, clinic *domain.Clinic) error
 		Username:      gocloak.StringP(clinic.Email),
 		Email:         gocloak.StringP(clinic.Email),
 		FirstName:     gocloak.StringP(clinic.ClinicName),
+		LastName:      gocloak.StringP("-"),
 		Enabled:       &enabled,
 		EmailVerified: gocloak.BoolP(true), // Assuming clinics are verified or handled via code below
 		Attributes: &map[string][]string{
 			"tipo_usuario": {"clinica"},
 		},
-		RequiredActions: &[]string{},
 	}
 
 	// 3. Create User in Keycloak
@@ -93,29 +91,22 @@ func (s *AuthService) Register(ctx context.Context, clinic *domain.Clinic) error
 	if err != nil {
 		s.Logger.Log(logger.LogEntry{
 			OriginService: "auth",
-			ActionType:    "register_keycloak",
-			Description:   fmt.Sprintf("Failed to create user in Keycloak for %s: %v", clinic.Email, err),
+			ActionType:    "register",
+			Description:   fmt.Sprintf("Falha ao criar usuário no Keycloak para %s: %v", clinic.Email, err),
 			ResultStatus:  "error",
 		})
-		return fmt.Errorf("failed to create user in Keycloak: %v", err)
+		return fmt.Errorf("erro ao criar usuário no Keycloak: %v", err)
 	}
 	clinic.KeycloakID = &keycloakID
 
 	// 4. Set Password in Keycloak
 	err = s.Keycloak.Client.SetPassword(ctx, token.AccessToken, keycloakID, s.Keycloak.Realm, clinic.Senha, false)
 	if err != nil {
-		s.Logger.Log(logger.LogEntry{
-			OriginService: "auth",
-			ActionType:    "register_keycloak",
-			Description:   fmt.Sprintf("Failed to set password in Keycloak for %s: %v", clinic.Email, err),
-			ResultStatus:  "error",
-		})
-		// Rollback Keycloak user creation if password setting fails
 		_ = s.Keycloak.Client.DeleteUser(ctx, token.AccessToken, s.Keycloak.Realm, keycloakID)
-		return fmt.Errorf("failed to set password in Keycloak: %v", err)
+		return fmt.Errorf("erro ao definir senha no Keycloak: %v", err)
 	}
 
-	// 5. Generate verification code for local logic (if still needed)
+	// 5. Generate verification code for local logic
 	code := fmt.Sprintf("%06d", rand.New(rand.NewSource(time.Now().UnixNano())).Intn(1000000))
 	clinic.VerificationCode = code
 	clinic.Verify = false
@@ -124,9 +115,8 @@ func (s *AuthService) Register(ctx context.Context, clinic *domain.Clinic) error
 
 	// 6. Save to DB
 	if err := s.clinicRepo.Save(ctx, clinic); err != nil {
-		// Rollback: delete user from Keycloak if DB save fails
 		_ = s.Keycloak.Client.DeleteUser(ctx, token.AccessToken, s.Keycloak.Realm, keycloakID)
-		return fmt.Errorf("failed to save clinic to database: %v", err)
+		return fmt.Errorf("erro ao salvar clínica no banco: %v", err)
 	}
 
 	// Send verification code
@@ -143,15 +133,15 @@ func (s *AuthService) VerifyCode(ctx context.Context, email, code string) error 
 		return err
 	}
 	if clinic == nil {
-		return errors.New("user not found")
+		return errors.New("usuário não encontrado")
 	}
 
 	if clinic.Verify {
-		return errors.New("user already verified")
+		return errors.New("usuário já verificado")
 	}
 
 	if clinic.VerificationCode != code {
-		return errors.New("invalid verification code")
+		return errors.New("código inválido")
 	}
 
 	clinic.Verify = true
@@ -169,84 +159,25 @@ type LoginResponse struct {
 }
 
 func (s *AuthService) Login(ctx context.Context, email, password string) (*LoginResponse, error) {
-	// 1. Authenticate with Keycloak
-	token, err := s.Keycloak.Client.Login(ctx, s.Keycloak.ClientID, s.Keycloak.ClientSecret, s.Keycloak.Realm, email, password)
-	if err != nil {
-		// Handle "Account is not fully set up" (Required Actions pending)
-		if strings.Contains(err.Error(), "Account is not fully set up") {
-			s.Logger.Log(logger.LogEntry{
-				OriginService: "auth",
-				ActionType:    "login_fix",
-				Description:   fmt.Sprintf("Attempting to fix partially set up account for %s", email),
-				ResultStatus:  "info",
-			})
-
-			// 1. Get Admin Token
-			adminToken, adminErr := s.Keycloak.Client.LoginClient(ctx, s.Keycloak.ClientID, s.Keycloak.ClientSecret, s.Keycloak.Realm)
-			if adminErr != nil {
-				s.Logger.Log(logger.LogEntry{
-					OriginService: "auth",
-					ActionType:    "login_fix_error",
-					Description:   fmt.Sprintf("Failed to get admin token to fix account: %v", adminErr),
-					ResultStatus:  "error",
-				})
-			} else {
-				// 2. Get User ID
-				users, userErr := s.Keycloak.Client.GetUsers(ctx, adminToken.AccessToken, s.Keycloak.Realm, gocloak.GetUsersParams{
-					Email: gocloak.StringP(email),
-				})
-				if userErr != nil || len(users) == 0 {
-					s.Logger.Log(logger.LogEntry{
-						OriginService: "auth",
-						ActionType:    "login_fix_error",
-						Description:   fmt.Sprintf("Failed to find user by email %s: %v", email, userErr),
-						ResultStatus:  "error",
-					})
-				} else {
-					// 3. Clear Required Actions and Ensure Email is Verified
-					users[0].RequiredActions = &[]string{}
-					users[0].EmailVerified = gocloak.BoolP(true)
-
-					updateErr := s.Keycloak.Client.UpdateUser(ctx, adminToken.AccessToken, s.Keycloak.Realm, *users[0])
-					if updateErr != nil {
-						s.Logger.Log(logger.LogEntry{
-							OriginService: "auth",
-							ActionType:    "login_fix_error",
-							Description:   fmt.Sprintf("Failed to update user %s: %v", email, updateErr),
-							ResultStatus:  "error",
-						})
-					} else {
-						s.Logger.Log(logger.LogEntry{
-							OriginService: "auth",
-							ActionType:    "login_fix_success",
-							Description:   fmt.Sprintf("Successfully updated user %s, retrying login", email),
-							ResultStatus:  "success",
-						})
-						// 4. Retry Login
-						token, err = s.Keycloak.Client.Login(ctx, s.Keycloak.ClientID, s.Keycloak.ClientSecret, s.Keycloak.Realm, email, password)
-					}
-				}
-			}
-		}
-
-		if err != nil {
-			s.Logger.Log(logger.LogEntry{
-				OriginService: "auth",
-				ActionType:    "login_keycloak",
-				Description:   fmt.Sprintf("Keycloak login failed for %s: %v", email, err),
-				ResultStatus:  "error",
-			})
-			return nil, errors.New("credenciais inválidas")
-		}
-	}
-
-	// 2. Fetch clinic info from local DB to check verification status and get ID
+	// 1. Fetch clinic info from local DB first to get CNPJ (Username)
 	clinic, err := s.clinicRepo.FindByEmail(ctx, email)
 	if err != nil {
 		return nil, err
 	}
 	if clinic == nil {
 		return nil, errors.New("clinica não encontrada no banco de dados local")
+	}
+
+	// 2. Authenticate with Keycloak using CNPJ (Username)
+	token, err := s.Keycloak.Client.Login(ctx, s.Keycloak.ClientID, s.Keycloak.ClientSecret, s.Keycloak.Realm, clinic.Email, password)
+	if err != nil {
+		s.Logger.Log(logger.LogEntry{
+			OriginService: "auth",
+			ActionType:    "login",
+			Description:   fmt.Sprintf("Falha no login Keycloak para %s: %v", email, err),
+			ResultStatus:  "error",
+		})
+		return nil, errors.New("credenciais inválidas")
 	}
 
 	if !clinic.Verify {
