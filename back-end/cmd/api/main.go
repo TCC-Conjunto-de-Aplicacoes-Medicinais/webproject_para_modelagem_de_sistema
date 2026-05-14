@@ -14,6 +14,7 @@ import (
 	"openhealth/internal/core/services"
 	"openhealth/pkg/config"
 	"openhealth/pkg/database"
+	"openhealth/pkg/logger"
 
 	"github.com/Nerzal/gocloak/v13"
 	"github.com/gin-contrib/cors"
@@ -27,12 +28,15 @@ func main() {
 	// 2. Connect DB
 	db := database.ConnectMariaDB(cfg)
 
-	// 3. Initialize Repositories and External Services
+	// 3. Initialize Shared Services
+	appLogger := logger.NewLogger()
+
+	// 4. Initialize Repositories and External Services
 	clinicRepo := mariadb.NewClinicRepository(db)
 	minioService := minio.NewMinioStorageService(cfg.MinioEndpoint, cfg.MinioAccessKey, cfg.MinioSecretKey, cfg.MinioBucketName, cfg.MinioUseSSL)
 	emailService := email.NewSMTPEmailService(cfg.SMTPHost, cfg.SMTPPort, cfg.SMTPUser, cfg.SMTPPassword)
 
-	// 4. Initialize Core Services (Use Cases)
+	// 5. Initialize Core Services (Use Cases)
 	kcAuth := &services.KeycloakAuth{
 		Client:       gocloak.NewClient(cfg.KeycloakURL),
 		ClientID:     cfg.KeycloakClientID,
@@ -46,11 +50,12 @@ func main() {
 		cfg.JWTSecret,
 		cfg.JWTExpirationHours,
 		kcAuth,
+		appLogger,
 	)
 	projectService := services.NewProjectService(minioService, clinicRepo, cfg.ObjectVaultKey)
 
-	// 5. Initialize HTTP Handlers
-	authHandler := httpHandlers.NewAuthHandler(authService)
+	// 6. Initialize HTTP Handlers
+	authHandler := httpHandlers.NewAuthHandler(authService, appLogger)
 	projectHandler := httpHandlers.NewProjectHandler(projectService)
 
 	// 6. Setup Gin Router

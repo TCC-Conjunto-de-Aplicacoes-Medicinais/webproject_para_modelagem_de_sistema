@@ -2,18 +2,18 @@ package mariadb
 
 import (
 	"context"
+	"database/sql"
 	"openhealth/internal/core/domain"
 	"openhealth/internal/core/ports"
 
 	"github.com/google/uuid"
-	"gorm.io/gorm"
 )
 
 type clinicRepository struct {
-	db *gorm.DB
+	db *sql.DB
 }
 
-func NewClinicRepository(db *gorm.DB) ports.ClinicRepository {
+func NewClinicRepository(db *sql.DB) ports.ClinicRepository {
 	return &clinicRepository{db: db}
 }
 
@@ -41,7 +41,7 @@ func (r *clinicRepository) Save(ctx context.Context, clinic *domain.Clinic) erro
 			deleted_at = VALUES(deleted_at),
 			keycloak_id = VALUES(keycloak_id)
 	`
-	return r.db.WithContext(ctx).Exec(query,
+	_, err := r.db.ExecContext(ctx, query,
 		clinic.ID,
 		clinic.CNPJ,
 		clinic.Email,
@@ -57,62 +57,65 @@ func (r *clinicRepository) Save(ctx context.Context, clinic *domain.Clinic) erro
 		clinic.UpdatedAt,
 		clinic.DeletedAt,
 		clinic.KeycloakID,
-	).Error
+	)
+	return err
 }
 
 func (r *clinicRepository) FindByEmail(ctx context.Context, email string) (*domain.Clinic, error) {
-	var clinic domain.Clinic
-	query := "SELECT * FROM clinic WHERE email = ? LIMIT 1"
-	result := r.db.WithContext(ctx).Raw(query, email).Scan(&clinic)
-	if result.Error != nil {
-		return nil, result.Error
-	}
-	if result.RowsAffected == 0 {
-		return nil, nil
-	}
-	return &clinic, nil
+	query := "SELECT id, cnpj, email, responsible_name, clinic_name, location, specialty, phone, bucket_obj, verify, verification_code, created_at, updated_at, deleted_at, keycloak_id FROM clinic WHERE email = ? LIMIT 1"
+	row := r.db.QueryRowContext(ctx, query, email)
+	return r.scanClinic(row)
 }
 
 func (r *clinicRepository) FindByCNPJ(ctx context.Context, cnpj string) (*domain.Clinic, error) {
-	var clinic domain.Clinic
-	query := "SELECT * FROM clinic WHERE cnpj = ? LIMIT 1"
-	result := r.db.WithContext(ctx).Raw(query, cnpj).Scan(&clinic)
-	if result.Error != nil {
-		return nil, result.Error
-	}
-	if result.RowsAffected == 0 {
-		return nil, nil
-	}
-	return &clinic, nil
+	query := "SELECT id, cnpj, email, responsible_name, clinic_name, location, specialty, phone, bucket_obj, verify, verification_code, created_at, updated_at, deleted_at, keycloak_id FROM clinic WHERE cnpj = ? LIMIT 1"
+	row := r.db.QueryRowContext(ctx, query, cnpj)
+	return r.scanClinic(row)
 }
 
 func (r *clinicRepository) FindByID(ctx context.Context, id string) (*domain.Clinic, error) {
-	var clinic domain.Clinic
-	query := "SELECT * FROM clinic WHERE id = ? LIMIT 1"
-	result := r.db.WithContext(ctx).Raw(query, id).Scan(&clinic)
-	if result.Error != nil {
-		return nil, result.Error
-	}
-	if result.RowsAffected == 0 {
-		return nil, nil
-	}
-	return &clinic, nil
+	query := "SELECT id, cnpj, email, responsible_name, clinic_name, location, specialty, phone, bucket_obj, verify, verification_code, created_at, updated_at, deleted_at, keycloak_id FROM clinic WHERE id = ? LIMIT 1"
+	row := r.db.QueryRowContext(ctx, query, id)
+	return r.scanClinic(row)
 }
 
 func (r *clinicRepository) FindByKeycloakID(ctx context.Context, keycloakID string) (*domain.Clinic, error) {
-	var clinic domain.Clinic
-	query := "SELECT * FROM clinic WHERE keycloak_id = ? LIMIT 1"
-	result := r.db.WithContext(ctx).Raw(query, keycloakID).Scan(&clinic)
-	if result.Error != nil {
-		return nil, result.Error
-	}
-	if result.RowsAffected == 0 {
-		return nil, nil
-	}
-	return &clinic, nil
+	query := "SELECT id, cnpj, email, responsible_name, clinic_name, location, specialty, phone, bucket_obj, verify, verification_code, created_at, updated_at, deleted_at, keycloak_id FROM clinic WHERE keycloak_id = ? LIMIT 1"
+	row := r.db.QueryRowContext(ctx, query, keycloakID)
+	return r.scanClinic(row)
 }
 
 func (r *clinicRepository) UpdateBucketRef(ctx context.Context, id string, bucketRef string) error {
 	query := "UPDATE clinic SET bucket_obj = ? WHERE id = ?"
-	return r.db.WithContext(ctx).Exec(query, bucketRef, id).Error
+	_, err := r.db.ExecContext(ctx, query, bucketRef, id)
+	return err
 }
+
+func (r *clinicRepository) scanClinic(row *sql.Row) (*domain.Clinic, error) {
+	var clinic domain.Clinic
+	err := row.Scan(
+		&clinic.ID,
+		&clinic.CNPJ,
+		&clinic.Email,
+		&clinic.ResponsibleName,
+		&clinic.ClinicName,
+		&clinic.Location,
+		&clinic.Specialty,
+		&clinic.Phone,
+		&clinic.BucketObj,
+		&clinic.Verify,
+		&clinic.VerificationCode,
+		&clinic.CreatedAt,
+		&clinic.UpdatedAt,
+		&clinic.DeletedAt,
+		&clinic.KeycloakID,
+	)
+	if err == sql.ErrNoRows {
+		return nil, nil
+	}
+	if err != nil {
+		return nil, err
+	}
+	return &clinic, nil
+}
+

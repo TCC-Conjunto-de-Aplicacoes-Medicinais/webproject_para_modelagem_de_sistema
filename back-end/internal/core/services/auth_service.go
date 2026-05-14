@@ -7,6 +7,7 @@ import (
 	"math/rand"
 	"openhealth/internal/core/domain"
 	"openhealth/internal/core/ports"
+	"openhealth/pkg/logger"
 	"time"
 
 	"github.com/Nerzal/gocloak/v13"
@@ -25,6 +26,7 @@ type AuthService struct {
 	jwtSecret    string
 	jwtExpHours  int
 	Keycloak     *KeycloakAuth
+	Logger       *logger.Logger
 }
 
 func NewAuthService(
@@ -33,6 +35,7 @@ func NewAuthService(
 	jwtSecret string,
 	jwtExpHours int,
 	keycloak *KeycloakAuth,
+	l *logger.Logger,
 ) *AuthService {
 	return &AuthService{
 		clinicRepo:   clinicRepo,
@@ -40,6 +43,7 @@ func NewAuthService(
 		jwtSecret:    jwtSecret,
 		jwtExpHours:  jwtExpHours,
 		Keycloak:     keycloak,
+		Logger:       l,
 	}
 }
 
@@ -100,6 +104,8 @@ func (s *AuthService) Register(ctx context.Context, clinic *domain.Clinic) error
 	code := fmt.Sprintf("%06d", rand.New(rand.NewSource(time.Now().UnixNano())).Intn(1000000))
 	clinic.VerificationCode = code
 	clinic.Verify = false
+	clinic.CreatedAt = time.Now()
+	clinic.UpdatedAt = time.Now()
 
 	// 6. Save to DB
 	if err := s.clinicRepo.Save(ctx, clinic); err != nil {
@@ -135,6 +141,7 @@ func (s *AuthService) VerifyCode(ctx context.Context, email, code string) error 
 
 	clinic.Verify = true
 	clinic.VerificationCode = ""
+	clinic.UpdatedAt = time.Now()
 	return s.clinicRepo.Save(ctx, clinic)
 }
 
@@ -150,7 +157,7 @@ func (s *AuthService) Login(ctx context.Context, email, password string) (*Login
 	// 1. Authenticate with Keycloak
 	token, err := s.Keycloak.Client.Login(ctx, s.Keycloak.ClientID, s.Keycloak.ClientSecret, s.Keycloak.Realm, email, password)
 	if err != nil {
-		return nil, errors.New("invalid credentials")
+		return nil, errors.New("credenciais inválidas")
 	}
 
 	// 2. Fetch clinic info from local DB to check verification status and get ID
@@ -159,8 +166,7 @@ func (s *AuthService) Login(ctx context.Context, email, password string) (*Login
 		return nil, err
 	}
 	if clinic == nil {
-		// This should not happen if Keycloak auth succeeded, but good to check
-		return nil, errors.New("clinic not found in local database")
+		return nil, errors.New("clinica não encontrada no banco de dados local")
 	}
 
 	if !clinic.Verify {
@@ -171,7 +177,8 @@ func (s *AuthService) Login(ctx context.Context, email, password string) (*Login
 		AccessToken:  token.AccessToken,
 		RefreshToken: token.RefreshToken,
 		ExpiresIn:    token.ExpiresIn,
-		TokenType:    token.TokenType,
+		TokenType:    "Bearer",
 		InternalID:   clinic.ID,
 	}, nil
 }
+
