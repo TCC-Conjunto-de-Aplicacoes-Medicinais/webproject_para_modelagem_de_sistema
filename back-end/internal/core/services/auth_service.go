@@ -88,6 +88,12 @@ func (s *AuthService) Register(ctx context.Context, clinic *domain.Clinic) error
 	// 3. Create User in Keycloak
 	keycloakID, err := s.Keycloak.Client.CreateUser(ctx, token.AccessToken, s.Keycloak.Realm, keycloakUser)
 	if err != nil {
+		s.Logger.Log(logger.LogEntry{
+			OriginService: "auth",
+			ActionType:    "register_keycloak",
+			Description:   fmt.Sprintf("Failed to create user in Keycloak for %s: %v", clinic.Email, err),
+			ResultStatus:  "error",
+		})
 		return fmt.Errorf("failed to create user in Keycloak: %v", err)
 	}
 	clinic.KeycloakID = &keycloakID
@@ -95,6 +101,12 @@ func (s *AuthService) Register(ctx context.Context, clinic *domain.Clinic) error
 	// 4. Set Password in Keycloak
 	err = s.Keycloak.Client.SetPassword(ctx, token.AccessToken, keycloakID, s.Keycloak.Realm, clinic.Senha, false)
 	if err != nil {
+		s.Logger.Log(logger.LogEntry{
+			OriginService: "auth",
+			ActionType:    "register_keycloak",
+			Description:   fmt.Sprintf("Failed to set password in Keycloak for %s: %v", clinic.Email, err),
+			ResultStatus:  "error",
+		})
 		// Rollback Keycloak user creation if password setting fails
 		_ = s.Keycloak.Client.DeleteUser(ctx, token.AccessToken, s.Keycloak.Realm, keycloakID)
 		return fmt.Errorf("failed to set password in Keycloak: %v", err)
@@ -157,6 +169,12 @@ func (s *AuthService) Login(ctx context.Context, email, password string) (*Login
 	// 1. Authenticate with Keycloak
 	token, err := s.Keycloak.Client.Login(ctx, s.Keycloak.ClientID, s.Keycloak.ClientSecret, s.Keycloak.Realm, email, password)
 	if err != nil {
+		s.Logger.Log(logger.LogEntry{
+			OriginService: "auth",
+			ActionType:    "login_keycloak",
+			Description:   fmt.Sprintf("Keycloak login failed for %s: %v", email, err),
+			ResultStatus:  "error",
+		})
 		return nil, errors.New("credenciais inválidas")
 	}
 
