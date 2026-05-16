@@ -100,7 +100,7 @@ func main() {
 
 		// Protected Project Routes
 		projects := api.Group("/projects")
-		projects.Use(httpHandlers.AuthMiddleware(clinicRepo))
+		projects.Use(httpHandlers.AuthMiddleware(authService, clinicRepo))
 		{
 			projects.POST("", projectHandler.CreateProject)
 			projects.GET("", projectHandler.ListProjects)

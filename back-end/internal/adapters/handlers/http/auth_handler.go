@@ -8,6 +8,7 @@ import (
 	"strings"
 
 	"github.com/gin-gonic/gin"
+	"github.com/golang-jwt/jwt/v5"
 )
 
 type AuthHandler struct {
@@ -127,11 +128,7 @@ func (h *AuthHandler) Login(c *gin.Context) {
 	}
 
 	// Extrai ID do Keycloak do token para logar o sucesso
-	claims, _ := ExtractClinicClaims("Bearer " + resp.AccessToken)
-	userID := ""
-	if claims != nil {
-		userID = claims.KeycloakID
-	}
+	userID := extractSubFromToken(resp.AccessToken)
 
 	h.Logger.Log(logger.LogEntry{
 		OriginService: "auth",
@@ -234,4 +231,21 @@ func (h *AuthHandler) Verify(c *gin.Context) {
 		ResultStatus:  "success",
 	})
 	c.JSON(http.StatusOK, gin.H{"message": "Conta verificada com sucesso!"})
+}
+
+// extractSubFromToken extrai o campo "sub" do JWT para fins de logging.
+// Não realiza validação de assinatura (apenas parsing das claims).
+func extractSubFromToken(accessToken string) string {
+	token, _, err := new(jwt.Parser).ParseUnverified(accessToken, jwt.MapClaims{})
+	if err != nil {
+		return ""
+	}
+	claims, ok := token.Claims.(jwt.MapClaims)
+	if !ok {
+		return ""
+	}
+	if sub, ok := claims["sub"].(string); ok {
+		return sub
+	}
+	return ""
 }

@@ -15,6 +15,22 @@ type ClinicRepository interface {
 	UpdateBucketRef(ctx context.Context, id string, bucketRef string) error
 }
 
+// TokenValidator define métodos para validação de tokens via Keycloak.
+type TokenValidator interface {
+	// ValidateToken realiza introspecção do access token via Keycloak
+	// e retorna as claims se o token estiver ativo.
+	ValidateToken(ctx context.Context, accessToken string) (*TokenClaims, error)
+}
+
+// TokenClaims contém informações extraídas e validadas do token.
+type TokenClaims struct {
+	KeycloakID    string
+	Email         string
+	Name          string
+	EmailVerified bool
+	Active        bool
+}
+
 // StorageService defines methods for S3 interactions
 type StorageService interface {
 	UploadJSON(ctx context.Context, tenantID, projectID string, data []byte) error

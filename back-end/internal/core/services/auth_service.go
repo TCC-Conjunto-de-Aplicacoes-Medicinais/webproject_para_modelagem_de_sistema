@@ -11,6 +11,7 @@ import (
 	"time"
 
 	"github.com/Nerzal/gocloak/v13"
+	jwtLib "github.com/golang-jwt/jwt/v5"
 )
 
 type KeycloakAuth struct {
@@ -214,3 +215,51 @@ func (s *AuthService) Refresh(ctx context.Context, refreshToken string) (*Refres
 		RefreshToken: jwt.RefreshToken,
 	}, nil
 }
+
+// ValidateToken realiza a introspecção do access token via Keycloak (RFC 7662).
+// Retorna as claims se o token estiver ativo, ou erro caso contrário.
+func (s *AuthService) ValidateToken(ctx context.Context, accessToken string) (*ports.TokenClaims, error) {
+	rptResult, err := s.Keycloak.Client.RetrospectToken(
+		ctx,
+		accessToken,
+		s.Keycloak.ClientID,
+		s.Keycloak.ClientSecret,
+		s.Keycloak.Realm,
+	)
+	if err != nil {
+		return nil, fmt.Errorf("erro ao introspectar token: %w", err)
+	}
+
+	if rptResult.Active == nil || !*rptResult.Active {
+		return nil, errors.New("token inválido ou expirado")
+	}
+
+	// Token está ativo — extrair claims via ParseUnverified (já validado pelo Keycloak)
+	token, _, err := new(jwtLib.Parser).ParseUnverified(accessToken, jwtLib.MapClaims{})
+	if err != nil {
+		return nil, fmt.Errorf("erro ao parsear claims do token: %w", err)
+	}
+
+	claims, ok := token.Claims.(jwtLib.MapClaims)
+	if !ok {
+		return nil, errors.New("não foi possível ler as claims do token")
+	}
+
+	tokenClaims := &ports.TokenClaims{Active: true}
+
+	if sub, ok := claims["sub"].(string); ok {
+		tokenClaims.KeycloakID = sub
+	}
+	if email, ok := claims["email"].(string); ok {
+		tokenClaims.Email = email
+	}
+	if name, ok := claims["name"].(string); ok {
+		tokenClaims.Name = name
+	}
+	if verified, ok := claims["email_verified"].(bool); ok {
+		tokenClaims.EmailVerified = verified
+	}
+
+	return tokenClaims, nil
+}
+
