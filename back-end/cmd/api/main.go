@@ -1,6 +1,7 @@
 package main
 
 import (
+	"context"
 	"log"
 	"net/http"
 	"os"
@@ -31,19 +32,29 @@ func main() {
 	// 3. Initialize Shared Services
 	appLogger := logger.NewLogger()
 
-	// 4. Initialize Repositories and External Services
-	clinicRepo := mariadb.NewClinicRepository(db)
-	minioService := minio.NewMinioStorageService(cfg.MinioEndpoint, cfg.MinioAccessKey, cfg.MinioSecretKey, cfg.MinioBucketName, cfg.MinioUseSSL)
-	emailService := email.NewSMTPEmailService(cfg.SMTPHost, cfg.SMTPPort, cfg.SMTPUser, cfg.SMTPPassword)
+	// 4. Initialize Keycloak (valida conexão na inicialização)
+	kcClient := gocloak.NewClient(cfg.KeycloakURL)
 
-	// 5. Initialize Core Services (Use Cases)
+	ctx := context.Background()
+	_, err := kcClient.LoginClient(ctx, cfg.KeycloakClientID, cfg.KeycloakClientSecret, cfg.KeycloakRealm)
+	if err != nil {
+		log.Fatalf("❌ Erro ao conectar no Keycloak: %v", err)
+	}
+	log.Println("✅ Conexão com Keycloak estabelecida com sucesso!")
+
 	kcAuth := &services.KeycloakAuth{
-		Client:       gocloak.NewClient(cfg.KeycloakURL),
+		Client:       kcClient,
 		ClientID:     cfg.KeycloakClientID,
 		ClientSecret: cfg.KeycloakClientSecret,
 		Realm:        cfg.KeycloakRealm,
 	}
 
+	// 5. Initialize Repositories and External Services
+	clinicRepo := mariadb.NewClinicRepository(db)
+	minioService := minio.NewMinioStorageService(cfg.MinioEndpoint, cfg.MinioAccessKey, cfg.MinioSecretKey, cfg.MinioBucketName, cfg.MinioUseSSL)
+	emailService := email.NewSMTPEmailService(cfg.SMTPHost, cfg.SMTPPort, cfg.SMTPUser, cfg.SMTPPassword)
+
+	// 6. Initialize Core Services (Use Cases)
 	authService := services.NewAuthService(
 		clinicRepo,
 		emailService,
@@ -54,11 +65,11 @@ func main() {
 	)
 	projectService := services.NewProjectService(minioService, clinicRepo, cfg.ObjectVaultKey)
 
-	// 6. Initialize HTTP Handlers
+	// 7. Initialize HTTP Handlers
 	authHandler := httpHandlers.NewAuthHandler(authService, appLogger)
 	projectHandler := httpHandlers.NewProjectHandler(projectService)
 
-	// 6. Setup Gin Router
+	// 8. Setup Gin Router
 	r := gin.Default()
 
 	// CORS Setup
@@ -70,7 +81,7 @@ func main() {
 		AllowCredentials: true,
 	}))
 
-	// 7. Setup API Routes
+	// 9. Setup API Routes
 	api := r.Group("/api/v1")
 	{
 		// Health Check (usado pelo Docker HEALTHCHECK)
@@ -83,6 +94,7 @@ func main() {
 		{
 			auth.POST("/register", authHandler.Register)
 			auth.POST("/login", authHandler.Login)
+			auth.POST("/refresh", authHandler.Refresh)
 			auth.POST("/verify", authHandler.Verify)
 		}
 
@@ -96,7 +108,7 @@ func main() {
 		}
 	}
 
-	// 8. Servir Arquivos Estáticos do Next.js (front-end)
+	// 10. Servir Arquivos Estáticos do Next.js (front-end)
 	staticDir := "./static"
 
 	// Serve a pasta _next diretamente com alta performance (sem passar pelo fallback)
@@ -143,7 +155,7 @@ func main() {
 		c.JSON(http.StatusNotFound, gin.H{"error": "Page or file not found"})
 	})
 
-	// 9. Start Server
+	// 11. Start Server
 	log.Printf("Starting Open Health on port %s...", cfg.Port)
 	log.Printf("API routes:    /api/v1/*")
 	log.Printf("Static files:  %s", staticDir)

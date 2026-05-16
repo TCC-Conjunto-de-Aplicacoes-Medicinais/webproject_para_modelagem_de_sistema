@@ -5,6 +5,7 @@ import (
 	"openhealth/internal/core/domain"
 	"openhealth/internal/core/services"
 	"openhealth/pkg/logger"
+	"strings"
 
 	"github.com/gin-gonic/gin"
 )
@@ -85,6 +86,11 @@ type LoginRequest struct {
 }
 
 func (h *AuthHandler) Login(c *gin.Context) {
+	if h.authService == nil {
+		c.JSON(http.StatusInternalServerError, gin.H{"error": "serviço indisponível"})
+		return
+	}
+
 	var req LoginRequest
 	if err := c.ShouldBindJSON(&req); err != nil {
 		h.Logger.Log(logger.LogEntry{
@@ -100,19 +106,31 @@ func (h *AuthHandler) Login(c *gin.Context) {
 
 	resp, err := h.authService.Login(c.Request.Context(), req.Email, req.Senha)
 	if err != nil {
+		msg := err.Error()
 		h.Logger.Log(logger.LogEntry{
 			OriginService: "auth",
 			ActionType:    "login",
-			Description:   "falha no login (" + req.Email + "): " + err.Error(),
+			Description:   "falha no login (" + req.Email + "): " + msg,
 			OriginIP:      c.ClientIP(),
 			ResultStatus:  "error",
 		})
-		if err.Error() == "unverified_account" {
-			c.JSON(http.StatusForbidden, gin.H{"error": "unverified_account", "data": resp})
+		if msg == "unverified_account" {
+			c.JSON(http.StatusForbidden, gin.H{"error": "unverified_account"})
 			return
 		}
-		c.JSON(http.StatusUnauthorized, gin.H{"error": err.Error()})
+		if strings.Contains(msg, "credenciais") {
+			c.JSON(http.StatusUnauthorized, gin.H{"error": msg})
+			return
+		}
+		c.JSON(http.StatusInternalServerError, gin.H{"error": msg})
 		return
+	}
+
+	// Extrai ID do Keycloak do token para logar o sucesso
+	claims, _ := ExtractClinicClaims("Bearer " + resp.AccessToken)
+	userID := ""
+	if claims != nil {
+		userID = claims.KeycloakID
 	}
 
 	h.Logger.Log(logger.LogEntry{
@@ -121,7 +139,58 @@ func (h *AuthHandler) Login(c *gin.Context) {
 		Description:   "login realizado com sucesso: " + req.Email,
 		OriginIP:      c.ClientIP(),
 		ResultStatus:  "success",
-		UserID:        resp.InternalID,
+		UserID:        userID,
+	})
+	c.JSON(http.StatusOK, resp)
+}
+
+type RefreshRequest struct {
+	RefreshToken string `json:"refresh_token" binding:"required"`
+}
+
+func (h *AuthHandler) Refresh(c *gin.Context) {
+	if h.authService == nil {
+		c.JSON(http.StatusInternalServerError, gin.H{"error": "serviço indisponível"})
+		return
+	}
+
+	var req RefreshRequest
+	if err := c.ShouldBindJSON(&req); err != nil {
+		h.Logger.Log(logger.LogEntry{
+			OriginService: "auth",
+			ActionType:    "refresh",
+			Description:   "payload inválido: " + err.Error(),
+			OriginIP:      c.ClientIP(),
+			ResultStatus:  "error",
+		})
+		c.JSON(http.StatusBadRequest, gin.H{"error": err.Error()})
+		return
+	}
+
+	resp, err := h.authService.Refresh(c.Request.Context(), req.RefreshToken)
+	if err != nil {
+		msg := err.Error()
+		h.Logger.Log(logger.LogEntry{
+			OriginService: "auth",
+			ActionType:    "refresh",
+			Description:   "falha ao renovar token: " + msg,
+			OriginIP:      c.ClientIP(),
+			ResultStatus:  "error",
+		})
+		if strings.Contains(msg, "inválidas") || strings.Contains(msg, "sessão") {
+			c.JSON(http.StatusUnauthorized, gin.H{"error": msg})
+			return
+		}
+		c.JSON(http.StatusInternalServerError, gin.H{"error": msg})
+		return
+	}
+
+	h.Logger.Log(logger.LogEntry{
+		OriginService: "auth",
+		ActionType:    "refresh",
+		Description:   "token renovado com sucesso",
+		OriginIP:      c.ClientIP(),
+		ResultStatus:  "success",
 	})
 	c.JSON(http.StatusOK, resp)
 }

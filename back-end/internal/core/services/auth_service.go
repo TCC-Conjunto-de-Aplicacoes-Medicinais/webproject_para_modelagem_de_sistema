@@ -155,40 +155,62 @@ type LoginResponse struct {
 	RefreshToken string `json:"refresh_token"`
 	ExpiresIn    int    `json:"expires_in"`
 	TokenType    string `json:"token_type"`
-	InternalID   string `json:"internal_id"`
 }
 
 func (s *AuthService) Login(ctx context.Context, email, password string) (*LoginResponse, error) {
-	// 1. Fetch clinic info from local DB first to get CNPJ (Username)
+	// 1. Authenticate directly with Keycloak using email (username)
+	jwt, err := s.Keycloak.Client.Login(
+		ctx,
+		s.Keycloak.ClientID,
+		s.Keycloak.ClientSecret,
+		s.Keycloak.Realm,
+		email,
+		password,
+	)
+	if err != nil {
+		return nil, fmt.Errorf("credenciais inválidas: %w", err)
+	}
+
+	// 2. Check if the clinic is verified locally
 	clinic, err := s.clinicRepo.FindByEmail(ctx, email)
 	if err != nil {
 		return nil, err
 	}
-	if clinic == nil {
-		return nil, errors.New("clinica não encontrada no banco de dados local")
-	}
-
-	// 2. Authenticate with Keycloak using CNPJ (Username)
-	token, err := s.Keycloak.Client.Login(ctx, s.Keycloak.ClientID, s.Keycloak.ClientSecret, s.Keycloak.Realm, clinic.Email, password)
-	if err != nil {
-		s.Logger.Log(logger.LogEntry{
-			OriginService: "auth",
-			ActionType:    "login",
-			Description:   fmt.Sprintf("Falha no login Keycloak para %s: %v", email, err),
-			ResultStatus:  "error",
-		})
-		return nil, errors.New("credenciais inválidas")
-	}
-
-	if !clinic.Verify {
+	if clinic != nil && !clinic.Verify {
 		return nil, errors.New("unverified_account")
 	}
 
 	return &LoginResponse{
-		AccessToken:  token.AccessToken,
-		RefreshToken: token.RefreshToken,
-		ExpiresIn:    token.ExpiresIn,
+		AccessToken:  jwt.AccessToken,
 		TokenType:    "Bearer",
-		InternalID:   clinic.ID,
+		ExpiresIn:    jwt.ExpiresIn,
+		RefreshToken: jwt.RefreshToken,
+	}, nil
+}
+
+type RefreshResponse struct {
+	AccessToken  string `json:"access_token"`
+	TokenType    string `json:"token_type"`
+	ExpiresIn    int    `json:"expires_in"`
+	RefreshToken string `json:"refresh_token,omitempty"`
+}
+
+func (s *AuthService) Refresh(ctx context.Context, refreshToken string) (*RefreshResponse, error) {
+	jwt, err := s.Keycloak.Client.RefreshToken(
+		ctx,
+		refreshToken,
+		s.Keycloak.ClientID,
+		s.Keycloak.ClientSecret,
+		s.Keycloak.Realm,
+	)
+	if err != nil {
+		return nil, fmt.Errorf("erro ao revalidar sessão: %w", err)
+	}
+
+	return &RefreshResponse{
+		AccessToken:  jwt.AccessToken,
+		TokenType:    "Bearer",
+		ExpiresIn:    jwt.ExpiresIn,
+		RefreshToken: jwt.RefreshToken,
 	}, nil
 }
