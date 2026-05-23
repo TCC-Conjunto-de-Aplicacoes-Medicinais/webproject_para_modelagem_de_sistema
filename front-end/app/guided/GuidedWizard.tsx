@@ -49,7 +49,9 @@ export default function GuidedWizard({ onComplete }: GuidedWizardProps) {
   }, [state.currentStep]);
 
   // Determine if the "next" button should be enabled
-  const isNextDisabled = state.currentStep === 1 && !allModuleTabsVisited;
+  const isNextDisabled =
+    (state.currentStep === 0 && !state.identity.clinicName?.trim()) ||
+    (state.currentStep === 1 && !allModuleTabsVisited);
 
   const renderStep = () => {
     switch (state.currentStep) {
@@ -113,15 +115,25 @@ export default function GuidedWizard({ onComplete }: GuidedWizardProps) {
               },
             }}
           >
-            {GUIDED_STEP_LABELS.map((label, index) => (
-              <Step
-                key={label}
-                onClick={() => setStep(index as 0 | 1 | 2 | 3)}
-                sx={{ cursor: 'pointer' }}
-              >
-                <StepLabel>{label}</StepLabel>
-              </Step>
-            ))}
+            {GUIDED_STEP_LABELS.map((label, index) => {
+              const isClickable =
+                index <= state.currentStep ||
+                (index === state.currentStep + 1 && !isNextDisabled);
+
+              return (
+                <Step
+                  key={label}
+                  onClick={() => {
+                    if (isClickable) {
+                      setStep(index as 0 | 1 | 2 | 3);
+                    }
+                  }}
+                  sx={{ cursor: isClickable ? 'pointer' : 'default' }}
+                >
+                  <StepLabel>{label}</StepLabel>
+                </Step>
+              );
+            })}
           </Stepper>
         </Box>
 
@@ -169,7 +181,13 @@ export default function GuidedWizard({ onComplete }: GuidedWizardProps) {
 
           {canGoNext && state.currentStep < 3 && (
             <Tooltip
-              title={isNextDisabled ? 'Visite todas as abas (Médico, Assistente, Gerencial) antes de prosseguir' : ''}
+              title={
+                isNextDisabled
+                  ? state.currentStep === 0
+                    ? 'Preencha o nome da clínica para prosseguir'
+                    : 'Visite todas as abas (Médico, Assistente, Gerencial) antes de prosseguir'
+                  : ''
+              }
               arrow
             >
               <span>
@@ -242,8 +260,7 @@ export default function GuidedWizard({ onComplete }: GuidedWizardProps) {
           </Box>
           <Box
             sx={{
-              height: 'calc(100vh - 160px)',
-              overflow: 'auto',
+              overflow: 'hidden',
             }}
           >
             <SystemPreview fullscreen={fullscreen} onFullscreenChange={setFullscreen} />

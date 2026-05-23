@@ -4,6 +4,7 @@ import (
 	"log"
 	"os"
 	"strconv"
+	"strings"
 
 	"github.com/joho/godotenv"
 )
@@ -43,6 +44,42 @@ func LoadConfig() *Config {
 	jwtExp, _ := strconv.Atoi(getEnv("JWT_EXPIRATION_HOURS", "168"))
 	smtpPort, _ := strconv.Atoi(getEnv("SMTP_PORT", "587"))
 
+	// Fallback mapping for user-defined MinIO/Bucket variables
+	urlBucket := getEnv("URL_BUCKET", "")
+	minioEndpoint := getEnv("MINIO_ENDPOINT", "")
+	minioUseSSL := getEnv("MINIO_USE_SSL", "false") == "true"
+	if minioEndpoint == "" && urlBucket != "" {
+		minioEndpoint = urlBucket
+		if strings.HasPrefix(minioEndpoint, "https://") {
+			minioUseSSL = true
+			minioEndpoint = strings.TrimPrefix(minioEndpoint, "https://")
+		} else if strings.HasPrefix(minioEndpoint, "http://") {
+			minioUseSSL = false
+			minioEndpoint = strings.TrimPrefix(minioEndpoint, "http://")
+		}
+		minioEndpoint = strings.TrimSuffix(minioEndpoint, "/")
+	} else if minioEndpoint == "" {
+		minioEndpoint = "localhost:9000"
+	}
+
+	minioAccessKey := getEnv("MINIO_ACCESS_KEY", "")
+	if minioAccessKey == "" {
+		minioAccessKey = getEnv("BUCKET_USER", "")
+	}
+	if minioAccessKey == "" {
+		minioAccessKey = getEnv("BUCKET_USET", "")
+	}
+
+	minioSecretKey := getEnv("MINIO_SECRET_KEY", "")
+	if minioSecretKey == "" {
+		minioSecretKey = getEnv("BUCKET_PASSWORD", "")
+	}
+
+	minioBucketName := getEnv("MINIO_BUCKET_NAME", "")
+	if minioBucketName == "" {
+		minioBucketName = getEnv("BUCKET_NAME", "")
+	}
+
 	return &Config{
 		Port:               getEnv("PORT", "8080"),
 		DBHost:             getEnv("DB_HOST", "127.0.0.1"),
@@ -57,11 +94,11 @@ func LoadConfig() *Config {
 		SMTPPort:           smtpPort,
 		SMTPUser:           getEnv("SMTP_USER", ""),
 		SMTPPassword:       getEnv("SMTP_PASSWORD", ""),
-		MinioEndpoint:      getEnv("MINIO_ENDPOINT", "localhost:9000"),
-		MinioAccessKey:     getEnv("MINIO_ACCESS_KEY", ""),
-		MinioSecretKey:     getEnv("MINIO_SECRET_KEY", ""),
-		MinioBucketName:    getEnv("MINIO_BUCKET_NAME", ""),
-		MinioUseSSL:        getEnv("MINIO_USE_SSL", "false") == "true",
+		MinioEndpoint:      minioEndpoint,
+		MinioAccessKey:     minioAccessKey,
+		MinioSecretKey:     minioSecretKey,
+		MinioBucketName:    minioBucketName,
+		MinioUseSSL:        minioUseSSL,
 		ObjectVaultKey:     getEnv("OBJ_KEY", ""),
 		KeycloakURL:        getEnv("KEYCLOAK_URL", "http://localhost:8080"),
 		KeycloakRealm:      getEnv("KEYCLOAK_REALM", "openhealth"),

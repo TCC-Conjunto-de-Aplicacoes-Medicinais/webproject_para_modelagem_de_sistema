@@ -231,7 +231,7 @@ export default function SystemPreview({ fullscreen: controlledFullscreen, onFull
       <Box
         sx={{
           width: '100%',
-          minHeight: 500,
+          height: 380,
           display: 'flex',
           flexDirection: 'column',
           fontSize: '0.65rem',

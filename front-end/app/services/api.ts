@@ -1,4 +1,6 @@
-const API_BASE_URL = '/api/v1';
+const API_BASE_URL = process.env.NODE_ENV === 'development'
+  ? 'http://localhost:8080/api/v1'
+  : '/api/v1';
 
 export class ApiError extends Error {
   constructor(public message: string, public status?: number) {
@@ -48,6 +50,13 @@ export const api = {
     return fetchWithConfig('/auth/login', {
       method: 'POST',
       body: JSON.stringify(payload),
+    });
+  },
+
+  refresh: async (refreshToken: string) => {
+    return fetchWithConfig('/auth/refresh', {
+      method: 'POST',
+      body: JSON.stringify({ refresh_token: refreshToken }),
     });
   },
 

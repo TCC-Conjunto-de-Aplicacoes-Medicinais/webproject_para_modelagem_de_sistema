@@ -32,10 +32,12 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     const savedToken = localStorage.getItem(TOKEN_KEY);
     const savedEmail = localStorage.getItem('openhealth_email');
     const savedVerified = localStorage.getItem('openhealth_verified');
-    if (savedToken) {
+    if (savedToken && savedToken !== 'undefined') {
       setToken(savedToken);
       setUserEmail(savedEmail);
       setIsVerified(savedVerified !== 'false');
+    } else {
+      localStorage.removeItem(TOKEN_KEY);
     }
     setIsLoading(false);
   }, []);
@@ -49,15 +51,47 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     }
   }, [isVerified]);
 
+  // Periodic token refresh logic (runs every 4 minutes if authenticated)
+  useEffect(() => {
+    if (!token) return;
+
+    const interval = setInterval(async () => {
+      const savedRefreshToken = localStorage.getItem('openhealth_refresh_token');
+      if (savedRefreshToken) {
+        try {
+          const response = await api.refresh(savedRefreshToken);
+          const newAccessToken = response.access_token;
+          const newRefreshToken = response.refresh_token;
+
+          setToken(newAccessToken);
+          localStorage.setItem(TOKEN_KEY, newAccessToken);
+
+          if (newRefreshToken) {
+            localStorage.setItem('openhealth_refresh_token', newRefreshToken);
+          }
+        } catch (e) {
+          console.error('Failed to auto-refresh token:', e);
+          // Auto-logout if the refresh token is also invalid/expired
+          logout();
+        }
+      }
+    }, 4 * 60 * 1000); // 4 minutes
+
+    return () => clearInterval(interval);
+  }, [token]);
+
   const login = async (credentials: LoginCredentials) => {
     try {
       const response = await api.login(credentials);
-      const jwt = response.token;
+      const jwt = response.access_token;
       setToken(jwt);
       setUserEmail(credentials.email);
       setIsVerified(true);
       localStorage.setItem(TOKEN_KEY, jwt);
       localStorage.setItem('openhealth_email', credentials.email);
+      if (response.refresh_token) {
+        localStorage.setItem('openhealth_refresh_token', response.refresh_token);
+      }
     } catch (err: any) {
       if (err.message === 'unverified_account') {
         setToken(err.token || null);
@@ -82,6 +116,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     localStorage.removeItem(TOKEN_KEY);
     localStorage.removeItem('openhealth_email');
     localStorage.removeItem('openhealth_verified');
+    localStorage.removeItem('openhealth_refresh_token');
   };
 
   return (
