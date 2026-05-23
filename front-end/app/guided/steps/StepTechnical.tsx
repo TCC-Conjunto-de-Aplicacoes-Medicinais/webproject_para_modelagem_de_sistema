@@ -262,7 +262,13 @@ export default function StepTechnical() {
           computador.
         </Typography>
 
-        <Box sx={{ display: 'flex', gap: 2 }}>
+        <Box
+          sx={{
+            display: 'flex',
+            flexDirection: { xs: 'column', sm: 'row' },
+            gap: 2,
+          }}
+        >
           <Box sx={{ flex: 1 }}>
             <OptionCard
               selected={technical.deploymentType === 'web'}
@@ -302,7 +308,13 @@ export default function StepTechnical() {
           suas vantagens.
         </Typography>
 
-        <Box sx={{ display: 'flex', gap: 2 }}>
+        <Box
+          sx={{
+            display: 'flex',
+            flexDirection: { xs: 'column', md: 'row' },
+            gap: 2,
+          }}
+        >
           {/* AWS */}
           <Box sx={{ flex: 1 }}>
             <OptionCard
@@ -677,7 +689,14 @@ export default function StepTechnical() {
           confirmado após análise completa do projeto e pode variar conforme a demanda real.
         </Typography>
 
-        <Box sx={{ display: 'flex', gap: 2, mb: 3 }}>
+        <Box
+          sx={{
+            display: 'flex',
+            flexDirection: { xs: 'column', sm: 'row' },
+            gap: 2,
+            mb: 3,
+          }}
+        >
           {/* Monthly */}
           <Box
             sx={{

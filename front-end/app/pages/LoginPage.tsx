@@ -75,7 +75,13 @@ export default function LoginPage() {
         return;
       }
       let msg = err.message || 'Erro ao realizar login. Verifique suas credenciais.';
-      if (msg.includes('invalid credentials') || msg.includes('record not found')) {
+      const msgLower = msg.toLowerCase();
+      if (
+        msgLower.includes('invalid credentials') ||
+        msgLower.includes('invalid_grant') ||
+        msgLower.includes('credenciais inválidas') ||
+        msgLower.includes('record not found')
+      ) {
         msg = 'E-mail ou senha incorretos.';
       }
       setGlobalError(msg);

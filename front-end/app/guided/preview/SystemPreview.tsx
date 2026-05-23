@@ -44,6 +44,7 @@ interface SystemPreviewProps {
   /** Controlled fullscreen from parent */
   fullscreen?: boolean;
   onFullscreenChange?: (open: boolean) => void;
+  showMiniature?: boolean;
 }
 
 /**
@@ -53,7 +54,11 @@ interface SystemPreviewProps {
  * font-size/padding values in every screen component.
  */
 
-export default function SystemPreview({ fullscreen: controlledFullscreen, onFullscreenChange }: SystemPreviewProps) {
+export default function SystemPreview({
+  fullscreen: controlledFullscreen,
+  onFullscreenChange,
+  showMiniature = true,
+}: SystemPreviewProps) {
   const { state } = useSystemConfig();
   const theme = useTheme();
   const isDark = theme.palette.mode === 'dark';
@@ -72,6 +77,8 @@ export default function SystemPreview({ fullscreen: controlledFullscreen, onFull
   // Compute zoom factor based on window size vs miniature preview size
   // The miniature preview is designed at ~420px wide, ~500px tall
   const [zoomFactor, setZoomFactor] = useState(2.5);
+  const [isPortraitMobile, setIsPortraitMobile] = useState(false);
+  const [windowSize, setWindowSize] = useState({ width: 800, height: 600 });
   const containerRef = useRef<HTMLDivElement>(null);
 
   useEffect(() => {
@@ -80,11 +87,18 @@ export default function SystemPreview({ fullscreen: controlledFullscreen, onFull
     const computeZoom = () => {
       const vw = window.innerWidth;
       const vh = window.innerHeight;
-      // The miniature preview box is roughly 420px wide x 500px tall
-      // We want to fill the viewport, using the smaller scale so nothing gets cut off
-      const zoomX = vw / 420;
-      const zoomY = vh / 520;
-      setZoomFactor(Math.min(zoomX, zoomY));
+      setWindowSize({ width: vw, height: vh });
+
+      const isMobileDevice = window.matchMedia('(max-width: 900px)').matches;
+      const isPortrait = vh > vw;
+      const portraitMobile = isMobileDevice && isPortrait;
+      setIsPortraitMobile(portraitMobile);
+
+      const effectiveVh = portraitMobile ? vw : vh;
+
+      // Scale to fit the viewport height, and stretch width to fill 100% of the viewport width
+      const zoom = effectiveVh / 520;
+      setZoomFactor(zoom);
     };
 
     computeZoom();
@@ -228,18 +242,20 @@ export default function SystemPreview({ fullscreen: controlledFullscreen, onFull
   return (
     <>
       {/* ─── Miniature preview (in-page) ─── */}
-      <Box
-        sx={{
-          width: '100%',
-          height: 380,
-          display: 'flex',
-          flexDirection: 'column',
-          fontSize: '0.65rem',
-          overflow: 'hidden',
-        }}
-      >
-        {previewContent}
-      </Box>
+      {showMiniature && (
+        <Box
+          sx={{
+            width: '100%',
+            height: 380,
+            display: 'flex',
+            flexDirection: 'column',
+            fontSize: '0.65rem',
+            overflow: 'hidden',
+          }}
+        >
+          {previewContent}
+        </Box>
+      )}
 
       {/* ─── Fullscreen Dialog ─── */}
       <Dialog
@@ -250,6 +266,7 @@ export default function SystemPreview({ fullscreen: controlledFullscreen, onFull
           sx: {
             backgroundColor: isDark ? '#0F172A' : '#f5f7f6',
             overflow: 'hidden',
+            position: 'relative',
           },
         }}
       >
@@ -258,8 +275,15 @@ export default function SystemPreview({ fullscreen: controlledFullscreen, onFull
           onClick={() => setFullscreen(false)}
           sx={{
             position: 'fixed',
-            top: 16,
-            right: 16,
+            ...(isPortraitMobile
+              ? {
+                  bottom: 24,
+                  right: 24,
+                }
+              : {
+                  top: 16,
+                  right: 16,
+                }),
             zIndex: 9999,
             width: 40,
             height: 40,
@@ -277,10 +301,22 @@ export default function SystemPreview({ fullscreen: controlledFullscreen, onFull
         <Box
           ref={containerRef}
           sx={{
-            width: `${100 / zoomFactor}vw`,
-            height: `${100 / zoomFactor}vh`,
+            ...(isPortraitMobile
+              ? {
+                  width: `${windowSize.height / zoomFactor}px`,
+                  height: `${windowSize.width / zoomFactor}px`,
+                  position: 'absolute',
+                  top: 0,
+                  left: `${windowSize.width / zoomFactor}px`,
+                  transform: 'rotate(90deg)',
+                  transformOrigin: 'top left',
+                }
+              : {
+                  width: `${windowSize.width / zoomFactor}px`,
+                  height: `${windowSize.height / zoomFactor}px`,
+                  transformOrigin: 'top left',
+                }),
             zoom: zoomFactor,
-            transformOrigin: 'top left',
             overflow: 'hidden',
           }}
         >

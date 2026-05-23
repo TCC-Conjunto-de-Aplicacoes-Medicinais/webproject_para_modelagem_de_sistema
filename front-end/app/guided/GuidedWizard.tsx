@@ -36,6 +36,7 @@ export default function GuidedWizard({ onComplete }: GuidedWizardProps) {
   const { state, setStep, goNext, goBack, canGoNext, canGoBack } = useSystemConfig();
   const theme = useTheme();
   const isMobile = useMediaQuery(theme.breakpoints.down('lg'));
+  const isDark = theme.palette.mode === 'dark';
   const [previewOpen, setPreviewOpen] = useState(false);
   const [fullscreen, setFullscreen] = useState(false);
   const containerRef = useRef<HTMLDivElement>(null);
@@ -84,57 +85,100 @@ export default function GuidedWizard({ onComplete }: GuidedWizardProps) {
           minWidth: 0,
         }}
       >
-        {/* Stepper */}
+        {/* Stepper (Desktop) or Progress Bar (Mobile) */}
         <Box
           sx={{
             mb: 4,
-            p: 3,
+            p: isMobile ? 2 : 3,
             borderRadius: 3,
             backgroundColor: 'background.paper',
             border: '1px solid',
             borderColor: 'divider',
           }}
         >
-          <Stepper
-            activeStep={state.currentStep}
-            alternativeLabel
-            sx={{
-              '& .MuiStepLabel-label': {
-                fontSize: '0.8rem',
-                fontWeight: 500,
-              },
-              '& .MuiStepLabel-label.Mui-active': {
-                fontWeight: 700,
-                color: 'secondary.main',
-              },
-              '& .MuiStepIcon-root.Mui-active': {
-                color: 'secondary.main',
-              },
-              '& .MuiStepIcon-root.Mui-completed': {
-                color: 'success.main',
-              },
-            }}
-          >
-            {GUIDED_STEP_LABELS.map((label, index) => {
-              const isClickable =
-                index <= state.currentStep ||
-                (index === state.currentStep + 1 && !isNextDisabled);
-
-              return (
-                <Step
-                  key={label}
-                  onClick={() => {
-                    if (isClickable) {
-                      setStep(index as 0 | 1 | 2 | 3);
-                    }
+          {isMobile ? (
+            <Box sx={{ display: 'flex', flexDirection: 'column', gap: 1 }}>
+              <Box sx={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+                <Typography
+                  variant="caption"
+                  sx={{
+                    fontWeight: 600,
+                    color: 'secondary.main',
+                    textTransform: 'uppercase',
+                    letterSpacing: '0.05em',
                   }}
-                  sx={{ cursor: isClickable ? 'pointer' : 'default' }}
                 >
-                  <StepLabel>{label}</StepLabel>
-                </Step>
-              );
-            })}
-          </Stepper>
+                  Passo {state.currentStep + 1} de {GUIDED_STEP_LABELS.length}
+                </Typography>
+                <Typography variant="caption" sx={{ fontWeight: 500, color: 'text.secondary' }}>
+                  {Math.round(((state.currentStep + 1) / GUIDED_STEP_LABELS.length) * 100)}% concluído
+                </Typography>
+              </Box>
+              <Typography variant="body1" sx={{ fontWeight: 700, color: 'text.primary' }}>
+                {GUIDED_STEP_LABELS[state.currentStep]}
+              </Typography>
+              <Box
+                sx={{
+                  width: '100%',
+                  height: 6,
+                  backgroundColor: isDark ? '#1E293B' : '#E2E8F0',
+                  borderRadius: 3,
+                  overflow: 'hidden',
+                  mt: 0.5,
+                }}
+              >
+                <Box
+                  sx={{
+                    width: `${((state.currentStep + 1) / GUIDED_STEP_LABELS.length) * 100}%`,
+                    height: '100%',
+                    backgroundColor: 'secondary.main',
+                    transition: 'width 0.3s ease',
+                  }}
+                />
+              </Box>
+            </Box>
+          ) : (
+            <Stepper
+              activeStep={state.currentStep}
+              alternativeLabel
+              sx={{
+                '& .MuiStepLabel-label': {
+                  fontSize: '0.8rem',
+                  fontWeight: 500,
+                },
+                '& .MuiStepLabel-label.Mui-active': {
+                  fontWeight: 700,
+                  color: 'secondary.main',
+                },
+                '& .MuiStepIcon-root.Mui-active': {
+                  color: 'secondary.main',
+                },
+                '& .MuiStepIcon-root.Mui-completed': {
+                  color: 'success.main',
+                },
+              }}
+            >
+              {GUIDED_STEP_LABELS.map((label, index) => {
+                const isClickable =
+                  index <= state.currentStep ||
+                  (index === state.currentStep + 1 && !isNextDisabled);
+
+                return (
+                  <Step
+                    key={label}
+                    onClick={() => {
+                      if (isClickable) {
+                        setStep(index as 0 | 1 | 2 | 3);
+                      }
+                    }}
+                    sx={{ cursor: isClickable ? 'pointer' : 'default' }}
+                  >
+                    <StepLabel>{label}</StepLabel>
+                  </Step>
+                );
+              })}
+            </Stepper>
+          )}
         </Box>
 
         {/* Active Step Content */}
@@ -268,12 +312,12 @@ export default function GuidedWizard({ onComplete }: GuidedWizardProps) {
         </Box>
       )}
 
-      {/* ─── FAB + Drawer: Preview (Mobile) ──── */}
+      {/* ─── FAB + Fullscreen: Preview (Mobile) ──── */}
       {isMobile && (
         <>
           <Fab
             color="secondary"
-            onClick={() => setPreviewOpen(true)}
+            onClick={() => setFullscreen(true)}
             sx={{
               position: 'fixed',
               bottom: 24,
@@ -285,56 +329,11 @@ export default function GuidedWizard({ onComplete }: GuidedWizardProps) {
             <VisibilityIcon />
           </Fab>
 
-          <Drawer
-            anchor="bottom"
-            open={previewOpen}
-            onClose={() => setPreviewOpen(false)}
-            PaperProps={{
-              sx: {
-                height: '90vh',
-                borderTopLeftRadius: 20,
-                borderTopRightRadius: 20,
-              },
-            }}
-          >
-            <Box
-              sx={{
-                px: 2,
-                py: 1.5,
-                borderBottom: '1px solid',
-                borderColor: 'divider',
-                display: 'flex',
-                alignItems: 'center',
-                justifyContent: 'space-between',
-              }}
-            >
-              <Box sx={{ display: 'flex', alignItems: 'center', gap: 1 }}>
-                <VisibilityIcon sx={{ fontSize: 18, color: 'secondary.main' }} />
-                <Typography variant="body2" sx={{ fontWeight: 600 }}>
-                  Pré-visualização
-                </Typography>
-              </Box>
-              <Box sx={{ display: 'flex', gap: 1 }}>
-                <IconButton
-                  onClick={() => { setPreviewOpen(false); setFullscreen(true); }}
-                  size="small"
-                  sx={{
-                    backgroundColor: 'secondary.main',
-                    color: '#fff',
-                    '&:hover': { backgroundColor: 'secondary.dark' },
-                  }}
-                >
-                  <FullscreenIcon sx={{ fontSize: 16 }} />
-                </IconButton>
-                <IconButton onClick={() => setPreviewOpen(false)} size="small">
-                  <CloseIcon fontSize="small" />
-                </IconButton>
-              </Box>
-            </Box>
-            <Box sx={{ flex: 1, overflow: 'auto' }}>
-              <SystemPreview fullscreen={fullscreen} onFullscreenChange={setFullscreen} />
-            </Box>
-          </Drawer>
+          <SystemPreview
+            fullscreen={fullscreen}
+            onFullscreenChange={setFullscreen}
+            showMiniature={false}
+          />
         </>
       )}
     </Box>
