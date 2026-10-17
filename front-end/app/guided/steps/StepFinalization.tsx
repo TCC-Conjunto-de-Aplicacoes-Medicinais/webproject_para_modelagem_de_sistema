@@ -21,7 +21,6 @@ import ExtensionIcon from '@mui/icons-material/Extension';
 import DnsIcon from '@mui/icons-material/Dns';
 import SupportAgentIcon from '@mui/icons-material/SupportAgent';
 import LockOutlinedIcon from '@mui/icons-material/LockOutlined';
-import DownloadIcon from '@mui/icons-material/Download';
 import OpenInNewIcon from '@mui/icons-material/OpenInNew';
 import SecurityIcon from '@mui/icons-material/Security';
 import CloudDoneIcon from '@mui/icons-material/CloudDone';
@@ -180,17 +179,6 @@ function ProvisioningProgressDialog({
     };
   }, [open, isCompleted, isFailed, blueprint?.id, token]);
 
-  const handleDownloadBlueprint = () => {
-    if (!blueprint) return;
-    const dataStr = 'data:text/json;charset=utf-8,' + encodeURIComponent(JSON.stringify(blueprint, null, 2));
-    const downloadAnchor = document.createElement('a');
-    downloadAnchor.setAttribute('href', dataStr);
-    downloadAnchor.setAttribute('download', `blueprint_${safeName}_${blueprint.id || 'config'}.json`);
-    document.body.appendChild(downloadAnchor);
-    downloadAnchor.click();
-    downloadAnchor.remove();
-  };
-
   const formatTime = (s: number) => {
     const mins = Math.floor(s / 60);
     const secs = s % 60;
@@ -262,14 +250,6 @@ function ProvisioningProgressDialog({
             </Box>
 
             <Box sx={{ display: 'flex', gap: 1.5, justifyContent: 'center' }}>
-              <Button
-                variant="outlined"
-                color="inherit"
-                onClick={handleDownloadBlueprint}
-                startIcon={<DownloadIcon />}
-              >
-                Baixar Blueprint (.json)
-              </Button>
               <Button
                 variant="contained"
                 color="primary"
@@ -506,24 +486,6 @@ function ProvisioningProgressDialog({
               </Button>
 
               <Button
-                variant="outlined"
-                color="inherit"
-                size="large"
-                onClick={handleDownloadBlueprint}
-                startIcon={<DownloadIcon />}
-                sx={{
-                  px: 3,
-                  py: 1.2,
-                  borderRadius: 3,
-                  fontWeight: 600,
-                  textTransform: 'none',
-                  fontSize: '0.95rem',
-                }}
-              >
-                Baixar Blueprint (.json)
-              </Button>
-
-              <Button
                 variant="text"
                 color="inherit"
                 onClick={onClose}
@@ -666,18 +628,6 @@ export default function StepFinalization({ onComplete }: StepFinalizationProps) 
     } finally {
       setIsSaving(false);
     }
-  };
-
-  const handleDirectDownload = () => {
-    const bp = generateBlueprint();
-    const safeName = (identity.clinicName || 'clinica').toLowerCase().replace(/[^a-z0-9]/g, '_');
-    const dataStr = 'data:text/json;charset=utf-8,' + encodeURIComponent(JSON.stringify(bp, null, 2));
-    const downloadAnchor = document.createElement('a');
-    downloadAnchor.setAttribute('href', dataStr);
-    downloadAnchor.setAttribute('download', `blueprint_${safeName}_${bp.id}.json`);
-    document.body.appendChild(downloadAnchor);
-    downloadAnchor.click();
-    downloadAnchor.remove();
   };
 
   return (
@@ -841,24 +791,6 @@ export default function StepFinalization({ onComplete }: StepFinalizationProps) 
             }}
           >
             {isSaving ? <CircularProgress size={24} color="inherit" /> : 'Finalizar e Gerar Sistema'}
-          </Button>
-
-          <Button
-            variant="outlined"
-            color="inherit"
-            size="large"
-            onClick={handleDirectDownload}
-            startIcon={<DownloadIcon />}
-            sx={{
-              px: 3,
-              py: 1.5,
-              borderRadius: 3,
-              textTransform: 'none',
-              fontSize: '0.95rem',
-              fontWeight: 600,
-            }}
-          >
-            Baixar Blueprint (.json)
           </Button>
         </Box>
 

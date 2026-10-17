@@ -48,34 +48,35 @@ function calculatePrice(
   hasDR: boolean,
   avgPatients: number,
   avgDoctors: number,
+  avgAssistants: number,
   moduleCount: number,
 ): PriceBreakdown {
-  // Base mensal
-  const base = deployment === 'web' ? 297 : 197;
+  // Base mensal (SaaS Clínico especializado com conformidade CFM / LGPD / ANVISA)
+  const base = deployment === 'web' ? 490 : 380;
 
-  // Módulos ativos
-  const modules = moduleCount * 49;
+  // Módulos ativos (R$ 79 / módulo clínico especializado)
+  const modules = moduleCount * 79;
 
-  // Sizing (escala por volume)
-  const sizingFactor = Math.ceil(avgPatients / 100) * 29 + avgDoctors * 39;
-  const sizing = sizingFactor;
+  // Sizing (escala por volume operacional e licenciamento de usuários)
+  // R$ 49 a cada 100 pacientes cadastrados
+  // R$ 69 por médico com assinatura digital CFM e acesso ao módulo SaMD
+  // R$ 29 por assistente / recepcionista
+  const sizing = Math.ceil(avgPatients / 100) * 49 + avgDoctors * 69 + avgAssistants * 29;
 
-  // Ambiente
+  // Ambiente Cloud AWS dedicado (EC2 t3.medium + ALB + RDS Multi-AZ + S3 criptografado)
   let environment_cost = 0;
-  if (environment === 'aws') environment_cost = 189;
-  else environment_cost = 0; // local — sem custo de cloud
+  if (environment === 'aws') environment_cost = 290;
+  else environment_cost = 0; // local / on-premise — sem custo de cloud gerenciada
 
-  // DR
-  const dr = hasDR ? 149 : 0;
+  // Alta Disponibilidade e Recuperação de Desastres (DR Multi-AZ)
+  const dr = hasDR ? 250 : 0;
 
   const monthly = base + modules + sizing + environment_cost + dr;
 
-  // Setup
-  let setup = 0;
-  if (deployment === 'web') setup = 1490;
-  else setup = 990;
-  if (environment === 'local') setup += 500;
-  if (hasDR) setup += 790;
+  // Setup / Implantação e Validação Clínica
+  let setup = deployment === 'web' ? 2490 : 1890;
+  if (environment === 'local') setup += 600; // Apoio técnico on-premise
+  if (hasDR) setup += 900; // Homologação de failover e replicação
 
   return { base, modules, sizing, environment: environment_cost, dr, monthly, setup };
 }
@@ -217,6 +218,7 @@ export default function StepTechnical() {
         technical.hasDisasterRecovery,
         avgPatients,
         technical.sizing.avgDoctors,
+        technical.sizing.avgAssistants,
         moduleCount,
       ),
     [technical, moduleCount, avgPatients],
@@ -791,11 +793,11 @@ export default function StepTechnical() {
           </Typography>
 
           {[
-            { label: 'Plano base', value: price.base, desc: technical.deploymentType === 'web' ? 'Site' : 'Desktop' },
-            { label: `Módulos (${moduleCount} ativos)`, value: price.modules, desc: `${moduleCount} × R$ 49` },
-            { label: 'Dimensionamento', value: price.sizing, desc: `~${avgPatients} pac. / ${technical.sizing.avgDoctors} méd.` },
-            ...(price.environment > 0 ? [{ label: 'Ambiente Cloud AWS', value: price.environment, desc: 'EC2 t3.small + ALB + EBS gp3 (R$ 0,26/h)' }] : []),
-            ...(price.dr > 0 ? [{ label: 'Alta disponibilidade', value: price.dr, desc: 'Terraform + DR' }] : []),
+            { label: 'Plano base', value: price.base, desc: technical.deploymentType === 'web' ? 'SaaS Web Corporativo' : 'SaaS Desktop Local' },
+            { label: `Módulos (${moduleCount} ativos)`, value: price.modules, desc: `${moduleCount} × R$ 79/mês` },
+            { label: 'Dimensionamento', value: price.sizing, desc: `~${avgPatients} pac. | ${technical.sizing.avgDoctors} méd. | ${technical.sizing.avgAssistants} assist.` },
+            ...(price.environment > 0 ? [{ label: 'Ambiente Cloud AWS Dedicado', value: price.environment, desc: 'EC2 t3.medium + ALB + EBS gp3 + S3' }] : []),
+            ...(price.dr > 0 ? [{ label: 'Alta Disponibilidade & DR', value: price.dr, desc: 'Multi-AZ + Failover Automatizado' }] : []),
           ].map((item, i) => (
             <Box
               key={item.label}
