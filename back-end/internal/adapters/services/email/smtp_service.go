@@ -69,3 +69,51 @@ func (s *smtpEmailService) SendVerificationCode(ctx context.Context, toEmail, co
 	addr := fmt.Sprintf("%s:%d", s.host, s.port)
 	return smtp.SendMail(addr, auth, s.user, []string{toEmail}, msg)
 }
+
+func (s *smtpEmailService) SendPasswordResetCode(ctx context.Context, toEmail, code string) error {
+	auth := smtp.PlainAuth("", s.user, s.password, s.host)
+
+	subject := "Open Health - Recuperação de Senha"
+	mime := "MIME-version: 1.0;\nContent-Type: text/html; charset=\"UTF-8\";\n\n"
+
+	htmlBody := fmt.Sprintf(`
+	<!DOCTYPE html>
+	<html>
+	<head>
+		<meta charset="UTF-8">
+		<style>
+			body { font-family: 'Inter', Arial, sans-serif; background-color: #F8FAF9; margin: 0; padding: 40px 0; }
+			.container { max-width: 600px; margin: 0 auto; background: #ffffff; border-radius: 12px; overflow: hidden; box-shadow: 0 4px 20px rgba(0,0,0,0.05); }
+			.header { background: linear-gradient(135deg, #00C853, #1B5E3B); padding: 30px; text-align: center; color: white; }
+			.content { padding: 40px 30px; text-align: center; color: #333; }
+			.code-box { background: #E0F2E7; padding: 20px; font-size: 32px; font-weight: 800; letter-spacing: 6px; color: #00C853; border-radius: 8px; margin: 30px 0; display: inline-block; }
+			.footer { padding: 20px; text-align: center; font-size: 12px; color: #888; background: #f9f9f9; }
+			.warning { font-size: 13px; color: #777; margin-top: 20px; }
+		</style>
+	</head>
+	<body>
+		<div class="container">
+			<div class="header">
+				<h1 style="margin: 0; font-size: 24px;">Recuperação de Senha</h1>
+			</div>
+			<div class="content">
+				<p style="font-size: 16px; margin-bottom: 10px;">Recebemos uma solicitação para redefinir a senha da sua clínica.</p>
+				<p style="font-size: 16px;">Use o código de verificação abaixo para cadastrar uma nova senha:</p>
+				
+				<div class="code-box">%s</div>
+				
+				<p class="warning">Se você não solicitou a redefinição de senha, desconsidere esta mensagem. Sua conta permanece segura e a senha anterior inalterada.</p>
+			</div>
+			<div class="footer">
+				&copy; 2026 Open Health. Todos os direitos reservados.
+			</div>
+		</div>
+	</body>
+	</html>
+	`, code)
+
+	msg := []byte(fmt.Sprintf("To: %s\r\nSubject: %s\r\n%s%s", toEmail, subject, mime, htmlBody))
+
+	addr := fmt.Sprintf("%s:%d", s.host, s.port)
+	return smtp.SendMail(addr, auth, s.user, []string{toEmail}, msg)
+}

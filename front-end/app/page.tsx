@@ -8,6 +8,7 @@ import LandingPage from '@/app/pages/LandingPage';
 import LoginPage from '@/app/pages/LoginPage';
 import RegisterPage from '@/app/pages/RegisterPage';
 import VerifyPage from '@/app/pages/VerifyPage';
+import ResetPasswordPage from '@/app/pages/ResetPasswordPage';
 import SystemCreationPage from '@/app/pages/SystemCreationPage';
 import { PageRoute } from '@/app/types';
 
@@ -16,6 +17,7 @@ const PAGE_COMPONENTS: Record<PageRoute, React.ComponentType> = {
   [PageRoute.LOGIN]: LoginPage,
   [PageRoute.REGISTER]: RegisterPage,
   [PageRoute.VERIFY]: VerifyPage,
+  [PageRoute.RESET_PASSWORD]: ResetPasswordPage,
   [PageRoute.SYSTEM_CREATION]: SystemCreationPage,
 };
 

@@ -6,10 +6,23 @@ export class ApiError extends Error {
   constructor(public message: string, public status?: number) {
     super(message);
     this.name = 'ApiError';
+    Object.setPrototypeOf(this, ApiError.prototype);
   }
 }
 
-async function fetchWithConfig(endpoint: string, config: RequestInit = {}) {
+let isRefreshing = false;
+let refreshSubscribers: Array<(token: string) => void> = [];
+
+function subscribeTokenRefresh(cb: (token: string) => void) {
+  refreshSubscribers.push(cb);
+}
+
+function onRefreshed(token: string) {
+  refreshSubscribers.forEach((cb) => cb(token));
+  refreshSubscribers = [];
+}
+
+async function fetchWithConfig(endpoint: string, config: RequestInit = {}): Promise<any> {
   try {
     const response = await fetch(`${API_BASE_URL}${endpoint}`, {
       ...config,
@@ -21,14 +34,67 @@ async function fetchWithConfig(endpoint: string, config: RequestInit = {}) {
 
     const data = await response.json().catch(() => null);
 
+    // If 401 Unauthorized and not an auth route, attempt auto-refresh and retry
+    if (response.status === 401 && endpoint !== '/auth/login' && endpoint !== '/auth/refresh') {
+      const savedRefreshToken = typeof window !== 'undefined' ? localStorage.getItem('openhealth_refresh_token') : null;
+      if (savedRefreshToken) {
+        if (!isRefreshing) {
+          isRefreshing = true;
+          try {
+            const refreshRes = await fetch(`${API_BASE_URL}/auth/refresh`, {
+              method: 'POST',
+              headers: { 'Content-Type': 'application/json' },
+              body: JSON.stringify({ refresh_token: savedRefreshToken }),
+            });
+            const refreshData = await refreshRes.json().catch(() => null);
+            if (refreshRes.ok && refreshData?.access_token) {
+              const newAccessToken = refreshData.access_token;
+              localStorage.setItem('openhealth_token', newAccessToken);
+              if (refreshData.refresh_token) {
+                localStorage.setItem('openhealth_refresh_token', refreshData.refresh_token);
+              }
+              isRefreshing = false;
+              onRefreshed(newAccessToken);
+
+              // Retry current request
+              const newHeaders = {
+                ...config.headers,
+                'Content-Type': 'application/json',
+                Authorization: `Bearer ${newAccessToken}`,
+              };
+              return fetchWithConfig(endpoint, { ...config, headers: newHeaders });
+            }
+          } catch {
+            isRefreshing = false;
+          }
+          isRefreshing = false;
+        } else {
+          // Wait for the active refresh to finish then retry
+          return new Promise((resolve, reject) => {
+            subscribeTokenRefresh((newToken) => {
+              const newHeaders = {
+                ...config.headers,
+                'Content-Type': 'application/json',
+                Authorization: `Bearer ${newToken}`,
+              };
+              fetchWithConfig(endpoint, { ...config, headers: newHeaders })
+                .then(resolve)
+                .catch(reject);
+            });
+          });
+        }
+      }
+    }
+
     if (!response.ok) {
-      throw new ApiError(data?.error || 'Erro inesperado na API', response.status);
+      const errorMsg = data?.error || data?.message || `Erro inesperado na API (${response.status})`;
+      throw new ApiError(errorMsg, response.status);
     }
 
     return data;
-  } catch (error) {
-    if (error instanceof ApiError) throw error;
-    throw new ApiError('Erro de conexão com o servidor');
+  } catch (error: any) {
+    if (error instanceof ApiError || error?.name === 'ApiError') throw error;
+    throw new ApiError(error?.message || 'Erro de conexão com o servidor');
   }
 }
 
@@ -67,6 +133,20 @@ export const api = {
     });
   },
 
+  forgotPassword: async (email: string) => {
+    return fetchWithConfig('/auth/forgot-password', {
+      method: 'POST',
+      body: JSON.stringify({ email }),
+    });
+  },
+
+  resetPassword: async (payload: { email: string; code: string; new_password: string }) => {
+    return fetchWithConfig('/auth/reset-password', {
+      method: 'POST',
+      body: JSON.stringify(payload),
+    });
+  },
+
   // --- Projects ---
   createProject: async (token: string, data: any) => {
     return fetchWithConfig('/projects', {
@@ -90,6 +170,15 @@ export const api = {
   deleteProject: async (token: string, id: string) => {
     return fetchWithConfig(`/projects/${id}`, {
       method: 'DELETE',
+      headers: {
+        Authorization: `Bearer ${token}`,
+      },
+    });
+  },
+
+  getProjectStatus: async (token: string, id: string) => {
+    return fetchWithConfig(`/projects/${id}/status`, {
+      method: 'GET',
       headers: {
         Authorization: `Bearer ${token}`,
       },

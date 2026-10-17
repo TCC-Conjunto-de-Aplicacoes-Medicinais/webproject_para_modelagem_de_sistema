@@ -62,7 +62,6 @@ function calculatePrice(
   // Ambiente
   let environment_cost = 0;
   if (environment === 'aws') environment_cost = 189;
-  else if (environment === 'azure') environment_cost = 179;
   else environment_cost = 0; // local — sem custo de cloud
 
   // DR
@@ -328,18 +327,6 @@ export default function StepTechnical() {
             />
           </Box>
 
-          {/* Azure */}
-          <Box sx={{ flex: 1 }}>
-            <OptionCard
-              selected={technical.environment === 'azure'}
-              onClick={() => updateTechnical({ environment: 'azure' })}
-              icon={<StorageIcon sx={{ fontSize: 32 }} />}
-              title="Microsoft Azure"
-              description="Infraestrutura da Microsoft. Excelente integração com ferramentas corporativas."
-              accentColor={accentColor}
-            />
-          </Box>
-
           {/* Local */}
           <Box sx={{ flex: 1 }}>
             <OptionCard
@@ -430,12 +417,10 @@ export default function StepTechnical() {
                   <Switch
                     checked={technical.hasDisasterRecovery}
                     onChange={(_, v) => {
-                      // Auto-select: pick a different env than primary
-                      let autoEnv: EnvironmentType = 'aws';
-                      if (technical.environment === 'aws') autoEnv = 'azure';
-                      else if (technical.environment === 'azure') autoEnv = 'aws';
-                      else autoEnv = 'aws'; // local → default aws
-                      updateTechnical({ hasDisasterRecovery: v, drSecondaryEnv: v ? autoEnv : null });
+                      updateTechnical({
+                        hasDisasterRecovery: v,
+                        drSecondaryEnv: v ? (technical.environment === 'aws' ? 'aws' : 'local') : null,
+                      });
                     }}
                     sx={{
                       '& .MuiSwitch-switchBase.Mui-checked': { color: accentColor },
@@ -445,50 +430,18 @@ export default function StepTechnical() {
                 }
                 label={
                   <Typography variant="body2" sx={{ fontWeight: 500 }}>
-                    Ativar alta disponibilidade (+R$ 149/mês)
+                    Ativar alta disponibilidade & redundância (+R$ 149/mês)
                   </Typography>
                 }
               />
 
               <Collapse in={technical.hasDisasterRecovery}>
                 <Box sx={{ mt: 1.5, pl: 1 }}>
-                  <Typography variant="body2" sx={{ color: 'text.secondary', mb: 1 }}>
-                    Ambiente secundário (backup):
+                  <Typography variant="body2" sx={{ color: 'text.secondary', fontSize: '0.85rem' }}>
+                    {technical.environment === 'aws'
+                      ? 'Topologia Multi-AZ na AWS (subnets us-east-1a e us-east-1b) com Application Load Balancer redundante e tolerância automática a falhas.'
+                      : 'Política de contingência com rotina automatizada de snapshots e replicação para armazenamento seguro.'}
                   </Typography>
-                  <Box sx={{ display: 'flex', gap: 1.5 }}>
-                    {[
-                      { env: 'aws' as EnvironmentType, label: 'AWS' },
-                      { env: 'azure' as EnvironmentType, label: 'Azure' },
-                      { env: 'local' as EnvironmentType, label: 'Local' },
-                    ]
-                      .filter((opt) => opt.env !== technical.environment) // hide primary env
-                      .map((opt) => (
-                      <Box
-                        key={opt.env}
-                        onClick={() => updateTechnical({ drSecondaryEnv: opt.env })}
-                        sx={{
-                          px: 2,
-                          py: 0.8,
-                          borderRadius: 1.5,
-                          border: '1.5px solid',
-                          borderColor: technical.drSecondaryEnv === opt.env ? accentColor : 'divider',
-                          cursor: 'pointer',
-                          transition: 'all 0.15s ease',
-                          '&:hover': { borderColor: accentColor },
-                        }}
-                      >
-                        <Typography
-                          variant="body2"
-                          sx={{
-                            fontWeight: technical.drSecondaryEnv === opt.env ? 600 : 400,
-                            color: technical.drSecondaryEnv === opt.env ? accentColor : 'text.primary',
-                          }}
-                        >
-                          {opt.label}
-                        </Typography>
-                      </Box>
-                    ))}
-                  </Box>
                 </Box>
               </Collapse>
             </Box>
@@ -780,7 +733,7 @@ export default function StepTechnical() {
             { label: 'Plano base', value: price.base, desc: technical.deploymentType === 'web' ? 'Site' : 'Desktop' },
             { label: `Módulos (${moduleCount} ativos)`, value: price.modules, desc: `${moduleCount} × R$ 49` },
             { label: 'Dimensionamento', value: price.sizing, desc: `~${avgPatients} pac. / ${technical.sizing.avgDoctors} méd.` },
-            ...(price.environment > 0 ? [{ label: 'Ambiente cloud', value: price.environment, desc: technical.environment === 'aws' ? 'AWS' : 'Azure' }] : []),
+            ...(price.environment > 0 ? [{ label: 'Ambiente cloud', value: price.environment, desc: 'Amazon AWS' }] : []),
             ...(price.dr > 0 ? [{ label: 'Alta disponibilidade', value: price.dr, desc: 'Terraform + DR' }] : []),
           ].map((item, i) => (
             <Box

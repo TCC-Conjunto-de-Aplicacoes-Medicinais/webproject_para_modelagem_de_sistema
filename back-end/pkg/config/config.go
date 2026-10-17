@@ -33,6 +33,7 @@ type Config struct {
 	KeycloakRealm      string
 	KeycloakClientID   string
 	KeycloakClientSecret string
+	MotorURL           string
 }
 
 func LoadConfig() *Config {
@@ -104,6 +105,7 @@ func LoadConfig() *Config {
 		KeycloakRealm:      getEnv("KEYCLOAK_REALM", "openhealth"),
 		KeycloakClientID:   getEnv("KEYCLOAK_CLIENT_ID", "openhealth-api"),
 		KeycloakClientSecret: getEnv("KEYCLOAK_CLIENT_SECRET", ""),
+		MotorURL:           getEnv("MOTOR_URL", "http://localhost:8082"),
 	}
 }
 

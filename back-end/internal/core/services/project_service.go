@@ -1,12 +1,17 @@
 package services
 
 import (
+	"bytes"
 	"context"
 	"encoding/json"
 	"errors"
 	"fmt"
+	"io"
+	"log"
+	"net/http"
 	"openhealth/internal/core/ports"
 	"openhealth/pkg/vault"
+	"time"
 
 	"github.com/google/uuid"
 )
@@ -15,13 +20,15 @@ type ProjectService struct {
 	storageService ports.StorageService
 	clinicRepo     ports.ClinicRepository
 	seedToken      string // vault key component from environment
+	motorURL       string
 }
 
-func NewProjectService(storageService ports.StorageService, clinicRepo ports.ClinicRepository, seedToken string) *ProjectService {
+func NewProjectService(storageService ports.StorageService, clinicRepo ports.ClinicRepository, seedToken string, motorURL string) *ProjectService {
 	return &ProjectService{
 		storageService: storageService,
 		clinicRepo:     clinicRepo,
 		seedToken:      seedToken,
+		motorURL:       motorURL,
 	}
 }
 
@@ -68,6 +75,56 @@ func (s *ProjectService) CreateProject(ctx context.Context, tenantID string, inp
 		if err := s.clinicRepo.UpdateBucketRef(ctx, tenantID, bucketRef); err != nil {
 			return projectID, fmt.Errorf("project created, but failed to update bucket ref: %v", err)
 		}
+	}
+
+	// Trigger the generator motor asynchronously so we don't block the client/frontend
+	var sealed struct {
+		Nonce   string `json:"n"`
+		Payload string `json:"p"`
+	}
+	if err := json.Unmarshal(sealedData, &sealed); err == nil {
+		go func(email, cnpj, clinicName, motorURL string) {
+			if motorURL == "" {
+				log.Println("[ProjectService] Warning: MOTOR_URL is not configured, skipping generation trigger")
+				return
+			}
+			motorReq := struct {
+				Email string `json:"email"`
+				CNPJ  string `json:"cnpj"`
+				Data  struct {
+					Payload string `json:"p"`
+					Nonce   string `json:"n"`
+				} `json:"data"`
+			}{}
+			motorReq.Email = email
+			motorReq.CNPJ = cnpj
+			motorReq.Data.Payload = sealed.Payload
+			motorReq.Data.Nonce = sealed.Nonce
+
+			reqBytes, err := json.Marshal(motorReq)
+			if err != nil {
+				log.Printf("[ProjectService] Error marshaling motor request: %v", err)
+				return
+			}
+
+			log.Printf("[ProjectService] Triggering system generation via motor at %s...", motorURL)
+			resp, err := http.Post(motorURL+"/generate", "application/json", bytes.NewBuffer(reqBytes))
+			if err != nil {
+				log.Printf("[ProjectService] Error calling motor: %v", err)
+				return
+			}
+			defer resp.Body.Close()
+
+			if resp.StatusCode != http.StatusOK {
+				bodyBytes, _ := io.ReadAll(resp.Body)
+				log.Printf("[ProjectService] Motor returned non-OK status %s: %s", resp.Status, string(bodyBytes))
+				return
+			}
+
+			log.Printf("[ProjectService] Successfully triggered motor generation for clinic %s", clinicName)
+		}(clinic.Email, clinic.CNPJ, clinic.ClinicName, s.motorURL)
+	} else {
+		log.Printf("[ProjectService] Failed to unmarshal sealed object for motor trigger: %v", err)
 	}
 
 	return projectID, nil
@@ -117,3 +174,41 @@ func (s *ProjectService) ListProjects(ctx context.Context, tenantID string) ([]i
 func (s *ProjectService) DeleteProject(ctx context.Context, tenantID, projectID string) error {
 	return s.storageService.DeleteObject(ctx, tenantID, projectID)
 }
+
+func (s *ProjectService) GetProjectStatus(ctx context.Context, tenantID, projectID string) (map[string]interface{}, error) {
+	clinic, err := s.clinicRepo.FindByID(ctx, tenantID)
+	if err != nil {
+		return nil, err
+	}
+	if clinic == nil {
+		return nil, errors.New("tenant not found")
+	}
+
+	motorURL := s.motorURL
+	if motorURL == "" {
+		motorURL = "http://localhost:8082"
+	}
+
+	client := &http.Client{Timeout: 3 * time.Second}
+	resp, err := client.Get(fmt.Sprintf("%s/status?clinic_id=%s", motorURL, projectID))
+	if err != nil {
+		return map[string]interface{}{
+			"clinic_id": projectID,
+			"status":    "provisioning",
+			"message":   "Aguardando sincronização com o motor IaC...",
+		}, nil
+	}
+	defer resp.Body.Close()
+
+	var result map[string]interface{}
+	if err := json.NewDecoder(resp.Body).Decode(&result); err != nil {
+		return map[string]interface{}{
+			"clinic_id": projectID,
+			"status":    "provisioning",
+			"message":   "Processando status da infraestrutura...",
+		}, nil
+	}
+
+	return result, nil
+}
+

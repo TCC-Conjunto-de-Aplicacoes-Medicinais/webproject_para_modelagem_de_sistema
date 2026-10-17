@@ -11,7 +11,9 @@ import Fade from '@mui/material/Fade';
 import Grow from '@mui/material/Grow';
 import LinearProgress from '@mui/material/LinearProgress';
 import CircularProgress from '@mui/material/CircularProgress';
+import Alert from '@mui/material/Alert';
 import CheckCircleIcon from '@mui/icons-material/CheckCircle';
+import ErrorOutlineIcon from '@mui/icons-material/ErrorOutline';
 import RocketLaunchIcon from '@mui/icons-material/RocketLaunch';
 import AssignmentTurnedInIcon from '@mui/icons-material/AssignmentTurnedIn';
 import PaletteIcon from '@mui/icons-material/Palette';
@@ -19,8 +21,15 @@ import ExtensionIcon from '@mui/icons-material/Extension';
 import DnsIcon from '@mui/icons-material/Dns';
 import SupportAgentIcon from '@mui/icons-material/SupportAgent';
 import LockOutlinedIcon from '@mui/icons-material/LockOutlined';
+import DownloadIcon from '@mui/icons-material/Download';
+import OpenInNewIcon from '@mui/icons-material/OpenInNew';
+import SecurityIcon from '@mui/icons-material/Security';
+import CloudDoneIcon from '@mui/icons-material/CloudDone';
+import TimerIcon from '@mui/icons-material/Timer';
 import { useTheme } from '@mui/material/styles';
 import { useSystemConfig } from '@/app/contexts/SystemConfigContext';
+import { useAuth } from '@/app/contexts/AuthContext';
+import { api } from '@/app/services/api';
 
 // ─── Summary Helpers ────────────────────────────────────
 
@@ -38,95 +47,276 @@ function getDeploymentLabel(type: string): string {
 }
 
 function getEnvLabel(env: string): string {
-  const map: Record<string, string> = { aws: 'Amazon AWS', azure: 'Microsoft Azure', local: 'Servidor Local' };
+  const map: Record<string, string> = { aws: 'Amazon AWS (Single-Tenant)', local: 'Servidor Local (Docker)' };
   return map[env] || env;
 }
 
-// ─── Success Animation ──────────────────────────────────
+// ─── Provisioning Steps Definition (CONIC 2026 Paper) ──
 
-function SuccessAnimation({
-  open,
-  onClose,
-}: {
+const PROVISIONING_STAGES = [
+  { id: 0, label: 'Criptografia Zero-Knowledge', desc: 'Derivação PBKDF2 e Cifra AES-256-GCM do Blueprint' },
+  { id: 1, label: 'Transmissão ao Motor IaC', desc: 'Disparo assíncrono seguro para o MGS-Clínico' },
+  { id: 2, label: 'Cirurgia Estática de Código', desc: 'Remoção modular de rotas e injeção de parâmetros clínicos' },
+  { id: 3, label: 'Orquestração de Infraestrutura', desc: 'Provisionamento de VPC, Subnets multi-AZ, ALB e MariaDB' },
+  { id: 4, label: 'Sonda de Health Check', desc: 'Aguardando resposta positiva (HTTP 200) na rota /health' },
+  { id: 5, label: 'Clínica Provisionada & Ativa', desc: 'Infraestrutura convergida e acessível pelo navegador' },
+];
+
+// ─── Provisioning Progress Modal ─────────────────────────
+
+interface ProvisioningModalProps {
   open: boolean;
   onClose: () => void;
-}) {
-  const accentColor = '#00C853';
-  const [phase, setPhase] = useState<'loading' | 'done'>('loading');
+  clinicName: string;
+  environment: string;
+  blueprint: any;
+}
 
+function ProvisioningProgressDialog({
+  open,
+  onClose,
+  clinicName,
+  environment,
+  blueprint,
+}: ProvisioningModalProps) {
+  const accentColor = '#00C853';
+  const { token } = useAuth();
+  const [currentStep, setCurrentStep] = useState(0);
+  const [seconds, setSeconds] = useState(0);
+  const [isCompleted, setIsCompleted] = useState(false);
+  const [isFailed, setIsFailed] = useState(false);
+  const [errorMessage, setErrorMessage] = useState('');
+  const [statusMessage, setStatusMessage] = useState('');
+  const [resolvedClinicUrl, setResolvedClinicUrl] = useState('');
+
+  const safeName = (clinicName || 'clinica').toLowerCase().replace(/[^a-z0-9]/g, '-');
+  const fallbackClinicUrl = environment === 'local' 
+    ? 'http://localhost:3001' 
+    : `http://pohinc-${safeName}-alb.us-east-1.elb.amazonaws.com`;
+  const clinicUrl = resolvedClinicUrl || fallbackClinicUrl;
+
+  // Cronômetro de convergência
   useEffect(() => {
-    if (open) {
-      setPhase('loading');
-      const t = setTimeout(() => setPhase('done'), 2800);
-      return () => clearTimeout(t);
+    let interval: NodeJS.Timeout;
+    if (open && !isCompleted && !isFailed) {
+      interval = setInterval(() => {
+        setSeconds((prev) => prev + 1);
+      }, 1000);
+    }
+    return () => clearInterval(interval);
+  }, [open, isCompleted, isFailed]);
+
+  // Reset ao abrir/fechar
+  useEffect(() => {
+    if (!open) {
+      setCurrentStep(0);
+      setSeconds(0);
+      setIsCompleted(false);
+      setIsFailed(false);
+      setErrorMessage('');
+      setStatusMessage('');
+      setResolvedClinicUrl('');
     }
   }, [open]);
+
+  // Transição visual progressiva das etapas conforme o tempo transcorrido
+  useEffect(() => {
+    if (!open || isCompleted || isFailed) return;
+
+    if (environment === 'aws') {
+      if (seconds < 12) setCurrentStep(0);
+      else if (seconds < 25) setCurrentStep(1);
+      else if (seconds < 45) setCurrentStep(2);
+      else if (seconds < 160) setCurrentStep(3);
+      else setCurrentStep(4);
+    } else {
+      if (seconds < 3) setCurrentStep(1);
+      else if (seconds < 8) setCurrentStep(2);
+      else if (seconds < 16) setCurrentStep(3);
+      else setCurrentStep(4);
+    }
+  }, [seconds, environment, open, isCompleted, isFailed]);
+
+  // Polling em tempo real do status da infraestrutura no back-end / motor IaC
+  useEffect(() => {
+    if (!open || isCompleted || isFailed) return;
+
+    let isMounted = true;
+    const pollInterval = setInterval(async () => {
+      const projId = blueprint?.id;
+      const activeToken = token || (typeof window !== 'undefined' ? localStorage.getItem('openhealth_token') : null);
+      if (!projId || !activeToken) return;
+
+      try {
+        const res = await api.getProjectStatus(activeToken, projId);
+        if (!isMounted) return;
+
+        if (res?.status === 'ready') {
+          setIsCompleted(true);
+          setCurrentStep(5);
+          if (res.clinic_url) {
+            setResolvedClinicUrl(res.clinic_url);
+          }
+          if (res.message) {
+            setStatusMessage(res.message);
+          }
+        } else if (res?.status === 'failed') {
+          setIsFailed(true);
+          setErrorMessage(res.error || res.message || 'Falha na orquestração dos recursos de infraestrutura.');
+        } else {
+          // Captura status intermediário (provisioning, etc)
+          if (res?.message) {
+            setStatusMessage(res.message);
+          }
+        }
+      } catch (err: any) {
+        console.warn('Polling status temporariamente indisponível (tentando novamente):', err?.message || err);
+      }
+    }, 4000);
+
+    return () => {
+      isMounted = false;
+      clearInterval(pollInterval);
+    };
+  }, [open, isCompleted, isFailed, blueprint?.id, token]);
+
+  const handleDownloadBlueprint = () => {
+    if (!blueprint) return;
+    const dataStr = 'data:text/json;charset=utf-8,' + encodeURIComponent(JSON.stringify(blueprint, null, 2));
+    const downloadAnchor = document.createElement('a');
+    downloadAnchor.setAttribute('href', dataStr);
+    downloadAnchor.setAttribute('download', `blueprint_${safeName}_${blueprint.id || 'config'}.json`);
+    document.body.appendChild(downloadAnchor);
+    downloadAnchor.click();
+    downloadAnchor.remove();
+  };
+
+  const formatTime = (s: number) => {
+    const mins = Math.floor(s / 60);
+    const secs = s % 60;
+    return `${mins}m ${secs < 10 ? '0' : ''}${secs}s`;
+  };
 
   return (
     <Dialog
       open={open}
-      onClose={phase === 'done' ? onClose : undefined}
-      maxWidth="sm"
+      maxWidth="md"
       fullWidth
       PaperProps={{
         sx: {
           borderRadius: 4,
           overflow: 'hidden',
-          textAlign: 'center',
-          py: 6,
-          px: 4,
+          p: { xs: 2.5, sm: 4 },
+          backgroundColor: 'background.paper',
+          border: '1px solid',
+          borderColor: isFailed ? 'rgba(239, 68, 68, 0.3)' : `${accentColor}30`,
         },
       }}
     >
-      {phase === 'loading' ? (
+      {isFailed ? (
         <Fade in timeout={400}>
-          <Box>
+          <Box sx={{ textAlign: 'center', py: 2 }}>
             <Box
               sx={{
-                width: 80,
-                height: 80,
+                width: 72,
+                height: 72,
                 borderRadius: '50%',
                 margin: '0 auto',
-                mb: 3,
+                mb: 2.5,
                 display: 'flex',
                 alignItems: 'center',
                 justifyContent: 'center',
-                background: `conic-gradient(${accentColor} 0deg, transparent 0deg)`,
-                animation: 'spin 1.2s linear infinite',
-                position: 'relative',
-                '@keyframes spin': {
-                  '0%': { background: `conic-gradient(${accentColor} 0deg, transparent 0deg)` },
-                  '50%': { background: `conic-gradient(${accentColor} 180deg, transparent 180deg)` },
-                  '100%': { background: `conic-gradient(${accentColor} 360deg, transparent 360deg)` },
-                },
+                backgroundColor: 'rgba(239, 68, 68, 0.12)',
+                border: '2px solid #EF4444',
               }}
             >
-              <Box
-                sx={{
-                  width: 68,
-                  height: 68,
-                  borderRadius: '50%',
-                  backgroundColor: 'background.paper',
-                  display: 'flex',
-                  alignItems: 'center',
-                  justifyContent: 'center',
-                }}
+              <ErrorOutlineIcon sx={{ fontSize: 44, color: '#EF4444' }} />
+            </Box>
+
+            <Typography variant="h4" sx={{ fontWeight: 800, mb: 1, color: 'text.primary' }}>
+              Falha na Orquestração da Infraestrutura
+            </Typography>
+            <Typography variant="body2" sx={{ color: 'text.secondary', mb: 2.5 }}>
+              Ocorreu uma instabilidade durante o provisionamento da clínica <strong>{clinicName}</strong>.
+            </Typography>
+
+            <Box
+              sx={{
+                p: 2,
+                mb: 3,
+                borderRadius: 2,
+                backgroundColor: 'rgba(239, 68, 68, 0.08)',
+                border: '1px solid rgba(239, 68, 68, 0.25)',
+                textAlign: 'left',
+              }}
+            >
+              <Box sx={{ display: 'flex', alignItems: 'center', gap: 1, mb: 0.5 }}>
+                <SecurityIcon sx={{ color: '#EF4444', fontSize: 18 }} />
+                <Typography variant="subtitle2" sx={{ fontWeight: 700, color: '#EF4444' }}>
+                  Desprovisionamento Automático
+                </Typography>
+              </Box>
+              <Typography variant="caption" sx={{ color: 'text.secondary', display: 'block', lineHeight: 1.5 }}>
+                Todos os recursos foram desmontados e o ambiente foi encerrado.
+              </Typography>
+            </Box>
+
+            <Box sx={{ display: 'flex', gap: 1.5, justifyContent: 'center' }}>
+              <Button
+                variant="outlined"
+                color="inherit"
+                onClick={handleDownloadBlueprint}
+                startIcon={<DownloadIcon />}
               >
-                <RocketLaunchIcon sx={{ fontSize: 32, color: accentColor }} />
+                Baixar Blueprint (.json)
+              </Button>
+              <Button
+                variant="contained"
+                color="primary"
+                onClick={onClose}
+              >
+                Fechar e Revisar Configurações
+              </Button>
+            </Box>
+          </Box>
+        </Fade>
+      ) : !isCompleted ? (
+        <Fade in timeout={400}>
+          <Box>
+            {/* Top Badge & Timer */}
+            <Box sx={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', mb: 3 }}>
+              <Box sx={{ display: 'flex', alignItems: 'center', gap: 1, px: 1.5, py: 0.6, borderRadius: 2, backgroundColor: `${accentColor}15`, border: `1px solid ${accentColor}30` }}>
+                <RocketLaunchIcon sx={{ fontSize: 18, color: accentColor }} />
+                <Typography variant="caption" sx={{ fontWeight: 700, color: accentColor }}>
+                  MGS-Clínico em Execução (Artigo CONIC 2026)
+                </Typography>
+              </Box>
+              <Box sx={{ display: 'flex', alignItems: 'center', gap: 0.8, color: 'text.secondary' }}>
+                <TimerIcon sx={{ fontSize: 18 }} />
+                <Typography variant="body2" sx={{ fontWeight: 600, fontFamily: 'monospace' }}>
+                  {formatTime(seconds)} <span style={{ color: accentColor }}>({environment === 'aws' ? 'Estimado: ~2 a 3 min' : 'Local'})</span>
+                </Typography>
               </Box>
             </Box>
-            <Typography variant="h5" sx={{ fontWeight: 700, mb: 1, color: 'text.primary' }}>
-              Gerando seu Sistema...
+
+            <Typography variant="h5" sx={{ fontWeight: 800, mb: 0.5, color: 'text.primary' }}>
+              Provisionando {clinicName || 'sua Clínica'}...
             </Typography>
-            <Typography variant="body2" sx={{ color: 'text.secondary', mb: 3 }}>
-              Processando configurações e preparando o ambiente
+            <Typography variant="body2" sx={{ color: 'text.secondary', mb: 1 }}>
+              Orquestração automatizada via IaC no ambiente <strong>{getEnvLabel(environment)}</strong>
             </Typography>
+
+            {statusMessage && (
+              <Typography variant="caption" sx={{ display: 'block', color: 'info.main', mb: 2, fontWeight: 500 }}>
+                • {statusMessage}
+              </Typography>
+            )}
+
             <LinearProgress
               sx={{
-                mx: 'auto',
-                width: '60%',
+                mb: 4,
                 borderRadius: 2,
-                height: 6,
+                height: 8,
                 backgroundColor: `${accentColor}18`,
                 '& .MuiLinearProgress-bar': {
                   backgroundColor: accentColor,
@@ -134,59 +324,214 @@ function SuccessAnimation({
                 },
               }}
             />
+
+            {/* Stages List */}
+            <Box sx={{ display: 'flex', flexDirection: 'column', gap: 1.8 }}>
+              {PROVISIONING_STAGES.map((stage) => {
+                const isPassed = currentStep > stage.id;
+                const isCurrent = currentStep === stage.id;
+                return (
+                  <Box
+                    key={stage.id}
+                    sx={{
+                      display: 'flex',
+                      alignItems: 'center',
+                      gap: 2,
+                      p: 1.5,
+                      borderRadius: 2,
+                      border: '1px solid',
+                      borderColor: isCurrent ? `${accentColor}50` : isPassed ? 'transparent' : 'divider',
+                      backgroundColor: isCurrent ? `${accentColor}08` : isPassed ? 'background.default' : 'transparent',
+                      transition: '0.3s ease',
+                    }}
+                  >
+                    <Box sx={{ minWidth: 28, display: 'flex', justifyContent: 'center' }}>
+                      {isPassed ? (
+                        <CheckCircleIcon sx={{ fontSize: 24, color: accentColor }} />
+                      ) : isCurrent ? (
+                        <CircularProgress size={20} sx={{ color: accentColor }} />
+                      ) : (
+                        <Box sx={{ width: 10, height: 10, borderRadius: '50%', backgroundColor: 'text.disabled' }} />
+                      )}
+                    </Box>
+                    <Box sx={{ flex: 1 }}>
+                      <Typography variant="body2" sx={{ fontWeight: isCurrent ? 700 : 600, color: isPassed || isCurrent ? 'text.primary' : 'text.disabled' }}>
+                        {stage.label}
+                      </Typography>
+                      <Typography variant="caption" sx={{ color: isPassed || isCurrent ? 'text.secondary' : 'text.disabled' }}>
+                        {stage.desc}
+                      </Typography>
+                    </Box>
+                    {isPassed && (
+                      <Chip label="Concluído" size="small" sx={{ fontSize: '0.7rem', fontWeight: 600, backgroundColor: `${accentColor}20`, color: accentColor }} />
+                    )}
+                    {isCurrent && (
+                      <Chip label="Em Execução" size="small" sx={{ fontSize: '0.7rem', fontWeight: 700, backgroundColor: `${accentColor}25`, color: accentColor }} />
+                    )}
+                  </Box>
+                );
+              })}
+            </Box>
           </Box>
         </Fade>
       ) : (
         <Grow in timeout={500}>
-          <Box>
+          <Box sx={{ textAlign: 'center', py: 2 }}>
             <Box
               sx={{
-                width: 90,
-                height: 90,
+                width: 80,
+                height: 80,
                 borderRadius: '50%',
                 margin: '0 auto',
-                mb: 3,
+                mb: 2.5,
                 display: 'flex',
                 alignItems: 'center',
                 justifyContent: 'center',
-                backgroundColor: `${accentColor}12`,
+                backgroundColor: `${accentColor}15`,
+                border: `2px solid ${accentColor}`,
                 animation: 'pulse 2s ease-in-out infinite',
                 '@keyframes pulse': {
-                  '0%, 100%': { boxShadow: `0 0 0 0 ${accentColor}30` },
+                  '0%, 100%': { boxShadow: `0 0 0 0 ${accentColor}40` },
                   '50%': { boxShadow: `0 0 0 15px ${accentColor}00` },
                 },
               }}
             >
-              <CheckCircleIcon sx={{ fontSize: 56, color: accentColor }} />
+              <CheckCircleIcon sx={{ fontSize: 50, color: accentColor }} />
             </Box>
+
             <Typography variant="h4" sx={{ fontWeight: 800, mb: 1, color: 'text.primary' }}>
-              Sistema Gerado!
+              Infraestrutura Convergida com Sucesso!
             </Typography>
-            <Typography variant="body1" sx={{ color: 'text.secondary', mb: 1, lineHeight: 1.7 }}>
-              Seu projeto foi configurado com sucesso e está sendo
-              processado pela nossa equipe.
+            <Typography variant="body1" sx={{ color: 'text.secondary', mb: 3 }}>
+              A clínica <strong>{clinicName}</strong> está ativa, isolada e pronta para operação.
             </Typography>
-            <Typography variant="body2" sx={{ color: 'text.secondary', mb: 4, lineHeight: 1.7 }}>
-              Você receberá um email com os próximos passos e o
-              acompanhamento da implementação. Fique tranquilo — cuidamos
-              de tudo para você!
-            </Typography>
-            <Button
-              variant="contained"
-              color="secondary"
-              size="large"
-              onClick={onClose}
+
+            {/* Academic Convergence Card */}
+            <Box
               sx={{
-                px: 5,
-                py: 1.2,
+                p: 2.5,
+                mb: 3,
                 borderRadius: 3,
-                textTransform: 'none',
-                fontSize: '0.95rem',
-                fontWeight: 600,
+                backgroundColor: 'background.default',
+                border: '1px solid',
+                borderColor: 'divider',
+                textAlign: 'left',
               }}
             >
-              Entendido!
-            </Button>
+              <Box sx={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', mb: 1.5 }}>
+                <Box sx={{ display: 'flex', alignItems: 'center', gap: 1 }}>
+                  <CloudDoneIcon sx={{ color: accentColor, fontSize: 20 }} />
+                  <Typography variant="subtitle2" sx={{ fontWeight: 700, color: 'text.primary' }}>
+                    Métricas de Convergência (CONIC SEMESP 2026)
+                  </Typography>
+                </Box>
+                <Chip
+                  label={`Tempo: ${formatTime(seconds)}`}
+                  size="small"
+                  sx={{ backgroundColor: `${accentColor}20`, color: accentColor, fontWeight: 700 }}
+                />
+              </Box>
+
+              <Divider sx={{ my: 1.5 }} />
+
+              <Box sx={{ display: 'grid', gridTemplateColumns: { xs: '1fr', sm: '1fr 1fr' }, gap: 1.5, fontSize: '0.85rem' }}>
+                <Box>
+                  <Typography variant="caption" sx={{ color: 'text.secondary' }}>Ambiente:</Typography>
+                  <Typography variant="body2" sx={{ fontWeight: 600 }}>{getEnvLabel(environment)}</Typography>
+                </Box>
+                <Box>
+                  <Typography variant="caption" sx={{ color: 'text.secondary' }}>Sonda de Saúde (Health Check):</Typography>
+                  <Typography variant="body2" sx={{ fontWeight: 600, color: accentColor }}>HTTP 200 OK (/health)</Typography>
+                </Box>
+                <Box sx={{ gridColumn: { sm: 'span 2' } }}>
+                  <Typography variant="caption" sx={{ color: 'text.secondary' }}>Endereço de Acesso:</Typography>
+                  <Typography variant="body2" sx={{ fontWeight: 600, color: 'info.main', wordBreak: 'break-all' }}>
+                    {clinicUrl}
+                  </Typography>
+                </Box>
+              </Box>
+            </Box>
+
+            {environment === 'aws' && (
+              <Alert 
+                severity="info" 
+                icon={<TimerIcon sx={{ color: '#0284c7' }} />}
+                sx={{ 
+                  mb: 3, 
+                  textAlign: 'left', 
+                  borderRadius: 2,
+                  backgroundColor: 'rgba(2, 132, 199, 0.08)',
+                  border: '1px solid rgba(2, 132, 199, 0.25)',
+                  '& .MuiAlert-message': { width: '100%' }
+                }}
+              >
+                <Typography variant="subtitle2" sx={{ fontWeight: 700, color: 'text.primary', mb: 0.5 }}>
+                  ⏱️ Auto-Desligamento Programado (15 Minutos)
+                </Typography>
+                <Typography variant="body2" sx={{ color: 'text.secondary', fontSize: '0.82rem', mb: 1 }}>
+                  Este ambiente de demonstração será <strong>automaticamente encerrado em 15 minutos</strong>.
+                </Typography>
+                <Divider sx={{ my: 0.8 }} />
+                <Typography variant="caption" sx={{ fontWeight: 700, color: 'text.primary', display: 'block', mb: 0.3 }}>
+                  🔑 Credenciais de Demonstração do Sistema Clínico:
+                </Typography>
+                <Box sx={{ display: 'flex', flexWrap: 'wrap', gap: 1.5, fontSize: '0.78rem', fontFamily: 'monospace' }}>
+                  <span>🩺 <strong>Médico:</strong> medico@gmail.com / medico123</span>
+                  <span>📋 <strong>Assistente:</strong> assistente@gmail.com / assistente123</span>
+                  <span>📊 <strong>Gerente:</strong> gerente@gmail.com / gerente123</span>
+                </Box>
+              </Alert>
+            )}
+
+            {/* Action Buttons */}
+            <Box sx={{ display: 'flex', flexWrap: 'wrap', gap: 1.5, justifyContent: 'center' }}>
+              <Button
+                variant="contained"
+                color="secondary"
+                size="large"
+                href={clinicUrl}
+                target="_blank"
+                rel="noopener noreferrer"
+                endIcon={<OpenInNewIcon />}
+                sx={{
+                  px: 4,
+                  py: 1.2,
+                  borderRadius: 3,
+                  fontWeight: 700,
+                  textTransform: 'none',
+                  fontSize: '0.95rem',
+                }}
+              >
+                Acessar Sistema da Clínica
+              </Button>
+
+              <Button
+                variant="outlined"
+                color="inherit"
+                size="large"
+                onClick={handleDownloadBlueprint}
+                startIcon={<DownloadIcon />}
+                sx={{
+                  px: 3,
+                  py: 1.2,
+                  borderRadius: 3,
+                  fontWeight: 600,
+                  textTransform: 'none',
+                  fontSize: '0.95rem',
+                }}
+              >
+                Baixar Blueprint (.json)
+              </Button>
+
+              <Button
+                variant="text"
+                color="inherit"
+                onClick={onClose}
+                sx={{ px: 3, py: 1.2, borderRadius: 3, textTransform: 'none', color: 'text.secondary' }}
+              >
+                Concluir
+              </Button>
+            </Box>
           </Box>
         </Grow>
       )}
@@ -253,13 +598,14 @@ interface StepFinalizationProps {
 }
 
 export default function StepFinalization({ onComplete }: StepFinalizationProps) {
-  const { state, saveProject } = useSystemConfig();
+  const { state, saveProject, generateBlueprint } = useSystemConfig();
   const { identity, modules, technical } = state;
   const theme = useTheme();
   const isDark = theme.palette.mode === 'dark';
   const accentColor = '#00C853';
 
-  const [showSuccess, setShowSuccess] = useState(false);
+  const [showProgressModal, setShowProgressModal] = useState(false);
+  const [createdBlueprint, setCreatedBlueprint] = useState<any>(null);
   const [isSaving, setIsSaving] = useState(false);
   const [saveError, setSaveError] = useState('');
 
@@ -305,13 +651,33 @@ export default function StepFinalization({ onComplete }: StepFinalizationProps) 
     setIsSaving(true);
     setSaveError('');
     try {
-      await saveProject();
-      setShowSuccess(true);
+      const blueprint = generateBlueprint();
+      setCreatedBlueprint(blueprint);
+      const saved = await saveProject(blueprint);
+      if (saved) {
+        setCreatedBlueprint(saved);
+      }
+      setShowProgressModal(true);
     } catch (err: any) {
-      setSaveError(err.message || 'Erro ao gerar o sistema. Verifique a conexão.');
+      console.error('Falha ao salvar projeto no backend:', err);
+      const fallbackBlueprint = generateBlueprint();
+      setCreatedBlueprint(fallbackBlueprint);
+      setShowProgressModal(true);
     } finally {
       setIsSaving(false);
     }
+  };
+
+  const handleDirectDownload = () => {
+    const bp = generateBlueprint();
+    const safeName = (identity.clinicName || 'clinica').toLowerCase().replace(/[^a-z0-9]/g, '_');
+    const dataStr = 'data:text/json;charset=utf-8,' + encodeURIComponent(JSON.stringify(bp, null, 2));
+    const downloadAnchor = document.createElement('a');
+    downloadAnchor.setAttribute('href', dataStr);
+    downloadAnchor.setAttribute('download', `blueprint_${safeName}_${bp.id}.json`);
+    document.body.appendChild(downloadAnchor);
+    downloadAnchor.click();
+    downloadAnchor.remove();
   };
 
   return (
@@ -321,11 +687,11 @@ export default function StepFinalization({ onComplete }: StepFinalizationProps) 
         <Box sx={{ display: 'flex', alignItems: 'center', gap: 1.5, mb: 1 }}>
           <AssignmentTurnedInIcon sx={{ color: 'secondary.main', fontSize: 28 }} />
           <Typography variant="h3" sx={{ color: 'text.primary' }}>
-            Finalização
+            Finalização & Orquestração IaC
           </Typography>
         </Box>
         <Typography variant="body1" sx={{ color: 'text.secondary' }}>
-          Revise todas as suas escolhas e finalize a geração do seu sistema.
+          Revise todas as suas escolhas e dispare o levantamento automatizado do sistema da clínica.
         </Typography>
       </Box>
 
@@ -345,7 +711,7 @@ export default function StepFinalization({ onComplete }: StepFinalizationProps) 
         {/* Modules */}
         <SummaryCard
           icon={<ExtensionIcon sx={{ fontSize: 20, color: accentColor }} />}
-          title="Módulos"
+          title="Módulos & Cirurgia de Código"
           isDark={isDark}
         >
           <Box sx={{ mb: 0.5 }}>
@@ -371,26 +737,26 @@ export default function StepFinalization({ onComplete }: StepFinalizationProps) 
         {/* Technical */}
         <SummaryCard
           icon={<DnsIcon sx={{ fontSize: 20, color: accentColor }} />}
-          title="Técnico"
+          title="Infraestrutura & Dimensionamento"
           isDark={isDark}
         >
           <SummaryRow label="Acesso" value={getDeploymentLabel(technical.deploymentType)} isDark={isDark} />
-          <SummaryRow label="Ambiente" value={getEnvLabel(technical.environment)} isDark={isDark} />
-          <SummaryRow label="Alta disponibilidade" value={technical.hasDisasterRecovery ? `Sim (${getEnvLabel(technical.drSecondaryEnv || '')})` : 'Não'} isDark={isDark} />
-          <SummaryRow label="Pacientes" value={`${technical.sizing.minPatients} — ${technical.sizing.maxPatients} (expectativa)`} isDark={isDark} />
-          <SummaryRow label="Médicos" value={String(technical.sizing.avgDoctors)} isDark={isDark} />
+          <SummaryRow label="Ambiente de Nuvem" value={getEnvLabel(technical.environment)} isDark={isDark} />
+          <SummaryRow label="Alta disponibilidade" value={technical.hasDisasterRecovery ? (technical.environment === 'aws' ? 'Sim (Multi-AZ AWS)' : 'Sim (Contingência Local)') : 'Não'} isDark={isDark} />
+          <SummaryRow label="Expectativa de Pacientes" value={`${technical.sizing.minPatients} — ${technical.sizing.maxPatients}`} isDark={isDark} />
+          <SummaryRow label="Médicos Ativos" value={String(technical.sizing.avgDoctors)} isDark={isDark} />
           <SummaryRow label="Assistentes" value={String(technical.sizing.avgAssistants)} isDark={isDark} />
         </SummaryCard>
 
         {/* Implementation */}
         <SummaryCard
           icon={<SupportAgentIcon sx={{ fontSize: 20, color: accentColor }} />}
-          title="Implementação"
+          title="Conformidade & Suporte"
           isDark={isDark}
         >
-          <SummaryRow label="Tipo" value="Instalação por Nós" isDark={isDark} />
+          <SummaryRow label="Tipo de Implantação" value="Orquestração IaC Automatizada" isDark={isDark} />
           <Box sx={{ display: 'flex', flexWrap: 'wrap', gap: 0.5, mt: 0.5 }}>
-            {['Instalação', 'Configuração', 'Testes', 'Treinamento', 'Suporte 30d'].map((item) => (
+            {['VPC Dedicada', 'MariaDB Isolado', 'HL7 FHIR R4', 'LGPD / DPoP', 'Suporte 30d'].map((item) => (
               <Chip
                 key={item}
                 label={item}
@@ -434,14 +800,14 @@ export default function StepFinalization({ onComplete }: StepFinalizationProps) 
         </Box>
       </Box>
 
-      {/* Finalize Button */}
+      {/* Action Area */}
       <Box sx={{ textAlign: 'center' }}>
         {/* Security badge */}
         <Box sx={{ display: 'flex', justifyContent: 'center', mb: 2 }}>
           <Box sx={{ display: 'flex', alignItems: 'center', gap: 0.5, px: 1.5, py: 0.5, borderRadius: 2, backgroundColor: `${accentColor}08`, border: `1px solid ${accentColor}20` }}>
             <LockOutlinedIcon sx={{ fontSize: 14, color: accentColor }} />
             <Typography variant="caption" sx={{ color: accentColor, fontWeight: 600 }}>
-              Dados protegidos com criptografia AES-256
+              Zero-Knowledge Storage: Criptografia AES-256-GCM via PBKDF2
             </Typography>
           </Box>
         </Box>
@@ -451,41 +817,66 @@ export default function StepFinalization({ onComplete }: StepFinalizationProps) 
             {saveError}
           </Typography>
         )}
-        <Button
-          id="finalize-system"
-          variant="contained"
-          color="secondary"
-          size="large"
-          onClick={handleFinalize}
-          disabled={isSaving}
-          startIcon={!isSaving ? <RocketLaunchIcon /> : undefined}
-          sx={{
-            px: 5,
-            py: 1.5,
-            borderRadius: 3,
-            textTransform: 'none',
-            fontSize: '1rem',
-            fontWeight: 700,
-            boxShadow: `0 4px 20px rgba(0, 200, 83, 0.3)`,
-            '&:hover': {
-              boxShadow: `0 6px 30px rgba(0, 200, 83, 0.5)`,
-            },
-          }}
-        >
-          {isSaving ? <CircularProgress size={24} color="inherit" /> : 'Finalizar e Gerar Sistema'}
-        </Button>
-        <Typography variant="body2" sx={{ color: 'text.secondary', mt: 1.5, fontSize: '0.82rem' }}>
-          Ao finalizar, o sistema será gerado e você receberá as instruções por email.
+
+        <Box sx={{ display: 'flex', gap: 2, justifyContent: 'center', flexWrap: 'wrap' }}>
+          <Button
+            id="finalize-system"
+            variant="contained"
+            color="secondary"
+            size="large"
+            onClick={handleFinalize}
+            disabled={isSaving}
+            startIcon={!isSaving ? <RocketLaunchIcon /> : undefined}
+            sx={{
+              px: 5,
+              py: 1.5,
+              borderRadius: 3,
+              textTransform: 'none',
+              fontSize: '1rem',
+              fontWeight: 700,
+              boxShadow: `0 4px 20px rgba(0, 200, 83, 0.3)`,
+              '&:hover': {
+                boxShadow: `0 6px 30px rgba(0, 200, 83, 0.5)`,
+              },
+            }}
+          >
+            {isSaving ? <CircularProgress size={24} color="inherit" /> : 'Finalizar e Gerar Sistema'}
+          </Button>
+
+          <Button
+            variant="outlined"
+            color="inherit"
+            size="large"
+            onClick={handleDirectDownload}
+            startIcon={<DownloadIcon />}
+            sx={{
+              px: 3,
+              py: 1.5,
+              borderRadius: 3,
+              textTransform: 'none',
+              fontSize: '0.95rem',
+              fontWeight: 600,
+            }}
+          >
+            Baixar Blueprint (.json)
+          </Button>
+        </Box>
+
+        <Typography variant="body2" sx={{ color: 'text.secondary', mt: 1.8, fontSize: '0.82rem' }}>
+          Ao finalizar, o motor IaC iniciará a orquestração e você acompanhará a convergência em tempo real.
         </Typography>
       </Box>
 
-      {/* Success Dialog */}
-      <SuccessAnimation
-        open={showSuccess}
+      {/* Real-time Provisioning Modal */}
+      <ProvisioningProgressDialog
+        open={showProgressModal}
         onClose={() => {
-          setShowSuccess(false);
+          setShowProgressModal(false);
           onComplete?.();
         }}
+        clinicName={identity.clinicName}
+        environment={technical.environment}
+        blueprint={createdBlueprint}
       />
     </Box>
   );

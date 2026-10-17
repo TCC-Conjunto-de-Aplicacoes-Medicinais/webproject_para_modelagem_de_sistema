@@ -69,10 +69,21 @@ export function AuthProvider({ children }: { children: ReactNode }) {
           if (newRefreshToken) {
             localStorage.setItem('openhealth_refresh_token', newRefreshToken);
           }
-        } catch (e) {
-          console.error('Failed to auto-refresh token:', e);
-          // Auto-logout if the refresh token is also invalid/expired
-          logout();
+        } catch (e: any) {
+          console.warn('Auto-refresh token error:', e?.message || e);
+          // Only auto-logout if the refresh token was explicitly rejected with 401 or invalid session
+          const isExplicitUnauthorized = e?.status === 401;
+          const isSessionInvalid = typeof e?.message === 'string' && (
+            e.message.includes('invalid_grant') ||
+            e.message.includes('sessão') ||
+            e.message.includes('inválidas') ||
+            e.message.includes('Invalid refresh token')
+          );
+          if (isExplicitUnauthorized || isSessionInvalid) {
+            console.warn('Session expired permanently in Keycloak. Logging out.');
+            logout();
+          }
+          // If it was a network error or transient glitch, do NOT logout!
         }
       }
     }, 4 * 60 * 1000); // 4 minutes

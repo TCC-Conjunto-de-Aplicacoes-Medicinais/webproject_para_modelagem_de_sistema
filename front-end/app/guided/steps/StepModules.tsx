@@ -41,7 +41,7 @@ interface FeatureItem {
 const DOCTOR_FEATURES: FeatureItem[] = [
   { key: 'dashboard', label: 'Tela Inicial (Dashboard)', description: 'Mini-agenda, lembretes e visão geral do dia' },
   { key: 'patientList', label: 'Lista de Pacientes', description: 'Visualize e gerencie todos os seus pacientes' },
-  { key: 'patientRecord', label: 'Prontuário do Paciente', description: 'Ficha completa com histórico, arquivos e prescrições' },
+  { key: 'patientRecord', label: 'Prontuário do Paciente (HL7 FHIR R4)', description: 'Ficha clínica completa no padrão interoperável HL7 FHIR Release 4' },
   { key: 'consultationHistory', label: 'Histórico de Consultas', description: 'Registro detalhado de cada atendimento realizado' },
   { key: 'schedule', label: 'Agenda', description: 'Visualize e gerencie seus horários de atendimento' },
 ];
@@ -50,7 +50,7 @@ const PATIENT_RECORD_SUBFEATURES: FeatureItem[] = [
   { key: 'files', label: 'Arquivos e Exames', description: 'Acesse exames, histórico médico e documentos do paciente' },
   { key: 'allergies', label: 'Alergias', description: 'Registro de alergias e intolerâncias do paciente' },
   { key: 'fileUpload', label: 'Upload de Arquivos', description: 'Envie novos documentos e exames para o prontuário' },
-  { key: 'aiEcg', label: 'Análise de IA (ECG)', description: 'Análise inteligente de eletrocardiogramas por IA' },
+  { key: 'aiEcg', label: 'Análise de IA de ECG (SaMD RDC 657/2022)', description: 'Classificação de traçados por 1D-CNN multiagente em conformidade com SaMD ANVISA' },
   { key: 'prescriptions', label: 'Prescrições e Laudos', description: 'Emita laudos, receitas e solicitações de exames' },
   { key: 'prescriptionTemplate', label: 'Template de Prescrição', description: 'Upload de modelo base da clínica para preenchimento' },
   { key: 'digitalSignature', label: 'Receita com Assinatura Digital', description: 'Emita receitas com assinatura digital válida juridicamente' },

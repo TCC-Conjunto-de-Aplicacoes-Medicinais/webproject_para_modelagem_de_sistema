@@ -11,6 +11,11 @@ import Link from '@mui/material/Link';
 import InputAdornment from '@mui/material/InputAdornment';
 import IconButton from '@mui/material/IconButton';
 import Divider from '@mui/material/Divider';
+import Dialog from '@mui/material/Dialog';
+import DialogTitle from '@mui/material/DialogTitle';
+import DialogContent from '@mui/material/DialogContent';
+import DialogActions from '@mui/material/DialogActions';
+import Alert from '@mui/material/Alert';
 import { useTheme } from '@mui/material/styles';
 import EmailIcon from '@mui/icons-material/Email';
 import LockIcon from '@mui/icons-material/Lock';
@@ -20,6 +25,7 @@ import AutoAwesomeIcon from '@mui/icons-material/AutoAwesome';
 import CircularProgress from '@mui/material/CircularProgress';
 import { useNavigation } from '@/app/contexts/NavigationContext';
 import { useAuth } from '@/app/contexts/AuthContext';
+import { api } from '@/app/services/api';
 import { PageRoute, type LoginCredentials } from '@/app/types';
 
 const INITIAL_CREDENTIALS: LoginCredentials = {
@@ -29,7 +35,7 @@ const INITIAL_CREDENTIALS: LoginCredentials = {
 
 export default function LoginPage() {
   const { navigateTo } = useNavigation();
-  const { login } = useAuth();
+  const { login, setUserEmail } = useAuth();
   const theme = useTheme();
   const isDark = theme.palette.mode === 'dark';
   const [credentials, setCredentials] = useState<LoginCredentials>(INITIAL_CREDENTIALS);
@@ -37,6 +43,54 @@ export default function LoginPage() {
   const [errors, setErrors] = useState<Partial<LoginCredentials>>({});
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [globalError, setGlobalError] = useState('');
+
+  // Estados do Modal "Esqueceu a senha"
+  const [forgotDialogOpen, setForgotDialogOpen] = useState(false);
+  const [forgotEmail, setForgotEmail] = useState('');
+  const [forgotEmailError, setForgotEmailError] = useState('');
+  const [isForgotLoading, setIsForgotLoading] = useState(false);
+  const [forgotSuccess, setForgotSuccess] = useState('');
+  const [forgotError, setForgotError] = useState('');
+
+  const handleOpenForgot = () => {
+    setForgotEmail(credentials.email || '');
+    setForgotEmailError('');
+    setForgotSuccess('');
+    setForgotError('');
+    setForgotDialogOpen(true);
+  };
+
+  const handleCloseForgot = () => {
+    if (isForgotLoading) return;
+    setForgotDialogOpen(false);
+  };
+
+  const handleForgotSubmit = async (e: React.FormEvent) => {
+    e.preventDefault();
+    setForgotError('');
+    setForgotSuccess('');
+
+    if (!forgotEmail) {
+      setForgotEmailError('Email é obrigatório');
+      return;
+    } else if (!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(forgotEmail)) {
+      setForgotEmailError('Email inválido');
+      return;
+    }
+    setForgotEmailError('');
+
+    try {
+      setIsForgotLoading(true);
+      await api.forgotPassword(forgotEmail);
+      setUserEmail(forgotEmail);
+      setForgotDialogOpen(false);
+      navigateTo(PageRoute.RESET_PASSWORD);
+    } catch (err: any) {
+      setForgotError(err.message || 'Erro ao solicitar recuperação de senha.');
+    } finally {
+      setIsForgotLoading(false);
+    }
+  };
 
   const validateForm = (): boolean => {
     const newErrors: Partial<LoginCredentials> = {};
@@ -228,6 +282,7 @@ export default function LoginPage() {
                 type="button"
                 variant="body2"
                 underline="hover"
+                onClick={handleOpenForgot}
                 sx={{ color: 'secondary.main', fontWeight: 500, cursor: 'pointer' }}
               >
                 Esqueceu a senha?
@@ -273,6 +328,110 @@ export default function LoginPage() {
           </Box>
         </CardContent>
       </Card>
+
+      {/* Modal / Dialog de Recuperação de Senha */}
+      <Dialog
+        open={forgotDialogOpen}
+        onClose={handleCloseForgot}
+        maxWidth="xs"
+        fullWidth
+        slotProps={{
+          paper: {
+            sx: {
+              borderRadius: 3,
+              p: 1,
+              backgroundColor: isDark ? 'background.paper' : '#ffffff',
+            },
+          },
+        }}
+      >
+        <DialogTitle sx={{ fontWeight: 600, pb: 1 }}>
+          Recuperação de Senha
+        </DialogTitle>
+        <Box component="form" onSubmit={handleForgotSubmit} noValidate>
+          <DialogContent sx={{ pt: 1 }}>
+            <Typography variant="body2" color="text.secondary" sx={{ mb: 2 }}>
+              Informe o e-mail cadastrado na plataforma. Se ele for encontrado, enviaremos as orientações para redefinir sua senha.
+            </Typography>
+
+            {forgotSuccess ? (
+              <Alert severity="success" sx={{ mb: 2, borderRadius: 2 }}>
+                {forgotSuccess}
+              </Alert>
+            ) : null}
+
+            {forgotError ? (
+              <Alert severity="error" sx={{ mb: 2, borderRadius: 2 }}>
+                {forgotError}
+              </Alert>
+            ) : null}
+
+            {!forgotSuccess && (
+              <TextField
+                id="forgot-email"
+                fullWidth
+                label="Seu e-mail"
+                type="email"
+                value={forgotEmail}
+                onChange={(e) => {
+                  setForgotEmail(e.target.value);
+                  if (forgotEmailError) setForgotEmailError('');
+                }}
+                error={Boolean(forgotEmailError)}
+                helperText={forgotEmailError}
+                autoFocus
+                disabled={isForgotLoading}
+                slotProps={{
+                  input: {
+                    startAdornment: (
+                      <InputAdornment position="start">
+                        <EmailIcon sx={{ color: 'grey.400', fontSize: 20 }} />
+                      </InputAdornment>
+                    ),
+                  },
+                }}
+              />
+            )}
+
+            <Box sx={{ mt: 2, textAlign: 'center' }}>
+              <Link
+                component="button"
+                type="button"
+                variant="body2"
+                onClick={() => {
+                  setUserEmail(forgotEmail || credentials.email);
+                  setForgotDialogOpen(false);
+                  navigateTo(PageRoute.RESET_PASSWORD);
+                }}
+                sx={{ color: 'secondary.main', cursor: 'pointer', fontSize: '0.85rem' }}
+              >
+                Já tem um código de verificação? Clique aqui para redefinir.
+              </Link>
+            </Box>
+          </DialogContent>
+          <DialogActions sx={{ px: 3, pb: 2, pt: 1 }}>
+            <Button
+              onClick={handleCloseForgot}
+              disabled={isForgotLoading}
+              color="inherit"
+              sx={{ fontWeight: 500 }}
+            >
+              {forgotSuccess ? 'Fechar' : 'Cancelar'}
+            </Button>
+            {!forgotSuccess && (
+              <Button
+                type="submit"
+                variant="contained"
+                color="primary"
+                disabled={isForgotLoading}
+                sx={{ minWidth: 110 }}
+              >
+                {isForgotLoading ? <CircularProgress size={20} color="inherit" /> : 'Enviar'}
+              </Button>
+            )}
+          </DialogActions>
+        </Box>
+      </Dialog>
     </Box>
   );
 }

@@ -233,6 +233,59 @@ func (h *AuthHandler) Verify(c *gin.Context) {
 	c.JSON(http.StatusOK, gin.H{"message": "Conta verificada com sucesso!"})
 }
 
+type ForgotPasswordRequest struct {
+	Email string `json:"email" binding:"required,email"`
+}
+
+func (h *AuthHandler) ForgotPassword(c *gin.Context) {
+	var req ForgotPasswordRequest
+	if err := c.ShouldBindJSON(&req); err != nil {
+		c.JSON(http.StatusBadRequest, gin.H{"error": "E-mail inválido"})
+		return
+	}
+
+	_ = h.authService.ForgotPassword(c.Request.Context(), req.Email)
+
+	c.JSON(http.StatusOK, gin.H{
+		"message": "Se o e-mail informado estiver cadastrado, as instruções de recuperação foram enviadas.",
+	})
+}
+
+type ResetPasswordRequest struct {
+	Email       string `json:"email" binding:"required,email"`
+	Code        string `json:"code" binding:"required,len=6"`
+	NewPassword string `json:"new_password" binding:"required,min=6"`
+}
+
+func (h *AuthHandler) ResetPassword(c *gin.Context) {
+	var req ResetPasswordRequest
+	if err := c.ShouldBindJSON(&req); err != nil {
+		c.JSON(http.StatusBadRequest, gin.H{"error": "Dados inválidos. Verifique o e-mail, código de 6 dígitos e a nova senha (mínimo 6 caracteres)."})
+		return
+	}
+
+	if err := h.authService.ResetPassword(c.Request.Context(), req.Email, req.Code, req.NewPassword); err != nil {
+		h.Logger.Log(logger.LogEntry{
+			OriginService: "auth",
+			ActionType:    "reset-password",
+			Description:   "falha ao redefinir senha para " + req.Email + ": " + err.Error(),
+			OriginIP:      c.ClientIP(),
+			ResultStatus:  "error",
+		})
+		c.JSON(http.StatusBadRequest, gin.H{"error": err.Error()})
+		return
+	}
+
+	h.Logger.Log(logger.LogEntry{
+		OriginService: "auth",
+		ActionType:    "reset-password",
+		Description:   "senha redefinida com sucesso para " + req.Email,
+		OriginIP:      c.ClientIP(),
+		ResultStatus:  "success",
+	})
+	c.JSON(http.StatusOK, gin.H{"message": "Senha redefinida com sucesso! Você já pode entrar com a nova senha."})
+}
+
 // extractSubFromToken extrai o campo "sub" do JWT para fins de logging.
 // Não realiza validação de assinatura (apenas parsing das claims).
 func extractSubFromToken(accessToken string) string {

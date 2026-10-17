@@ -42,4 +42,5 @@ type StorageService interface {
 // EmailService defines methods for sending emails
 type EmailService interface {
 	SendVerificationCode(ctx context.Context, toEmail, code string) error
+	SendPasswordResetCode(ctx context.Context, toEmail, code string) error
 }

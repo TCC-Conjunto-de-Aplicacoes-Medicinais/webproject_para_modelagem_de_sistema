@@ -263,3 +263,83 @@ func (s *AuthService) ValidateToken(ctx context.Context, accessToken string) (*p
 	return tokenClaims, nil
 }
 
+// ForgotPassword gera código, salva no banco e envia e-mail de recuperação de senha
+func (s *AuthService) ForgotPassword(ctx context.Context, email string) error {
+	clinic, err := s.clinicRepo.FindByEmail(ctx, email)
+	if err != nil || clinic == nil {
+		return nil // Não revela se o e-mail existe no banco
+	}
+
+	recoveryCode := fmt.Sprintf("%06d", rand.Intn(1000000))
+	clinic.VerificationCode = recoveryCode
+	clinic.UpdatedAt = time.Now()
+	if err := s.clinicRepo.Save(ctx, clinic); err != nil {
+		return fmt.Errorf("erro ao salvar código de recuperação: %w", err)
+	}
+
+	if s.emailService != nil {
+		go func() {
+			_ = s.emailService.SendPasswordResetCode(context.Background(), email, recoveryCode)
+		}()
+	}
+
+	s.Logger.Log(logger.LogEntry{
+		OriginService: "auth",
+		ActionType:    "forgot-password",
+		Description:   "código de recuperação gerado para: " + email,
+		ResultStatus:  "success",
+	})
+
+	return nil
+}
+
+// ResetPassword valida o código de recuperação e atualiza a senha no Keycloak
+func (s *AuthService) ResetPassword(ctx context.Context, email, code, newPassword string) error {
+	if len(code) != 6 {
+		return errors.New("código deve ter 6 dígitos")
+	}
+	if len(newPassword) < 6 {
+		return errors.New("a nova senha deve ter no mínimo 6 caracteres")
+	}
+
+	clinic, err := s.clinicRepo.FindByEmail(ctx, email)
+	if err != nil || clinic == nil {
+		return errors.New("usuário não encontrado")
+	}
+
+	if clinic.VerificationCode == "" || clinic.VerificationCode != code {
+		return errors.New("código de recuperação inválido ou expirado")
+	}
+
+	// 1. Atualizar senha no Keycloak se possuir ID
+	if clinic.KeycloakID != nil && *clinic.KeycloakID != "" {
+		token, err := s.Keycloak.Client.LoginClient(ctx, s.Keycloak.ClientID, s.Keycloak.ClientSecret, s.Keycloak.Realm)
+		if err != nil {
+			return fmt.Errorf("erro ao autenticar no Keycloak: %w", err)
+		}
+
+		err = s.Keycloak.Client.SetPassword(ctx, token.AccessToken, *clinic.KeycloakID, s.Keycloak.Realm, newPassword, false)
+		if err != nil {
+			return fmt.Errorf("erro ao redefinir senha no Keycloak: %w", err)
+		}
+	}
+
+	// 2. Limpar código e marcar verificação
+	clinic.VerificationCode = ""
+	clinic.Verify = true
+	clinic.UpdatedAt = time.Now()
+	if err := s.clinicRepo.Save(ctx, clinic); err != nil {
+		return fmt.Errorf("erro ao atualizar dados da clínica: %w", err)
+	}
+
+	s.Logger.Log(logger.LogEntry{
+		OriginService: "auth",
+		ActionType:    "reset-password",
+		Description:   "senha redefinida com sucesso para: " + email,
+		ResultStatus:  "success",
+	})
+
+	return nil
+}
+
+

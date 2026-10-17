@@ -63,7 +63,7 @@ func main() {
 		kcAuth,
 		appLogger,
 	)
-	projectService := services.NewProjectService(minioService, clinicRepo, cfg.ObjectVaultKey)
+	projectService := services.NewProjectService(minioService, clinicRepo, cfg.ObjectVaultKey, cfg.MotorURL)
 
 	// 7. Initialize HTTP Handlers
 	authHandler := httpHandlers.NewAuthHandler(authService, appLogger)
@@ -96,6 +96,8 @@ func main() {
 			auth.POST("/login", authHandler.Login)
 			auth.POST("/refresh", authHandler.Refresh)
 			auth.POST("/verify", authHandler.Verify)
+			auth.POST("/forgot-password", authHandler.ForgotPassword)
+			auth.POST("/reset-password", authHandler.ResetPassword)
 		}
 
 		// Protected Project Routes
@@ -104,6 +106,7 @@ func main() {
 		{
 			projects.POST("", projectHandler.CreateProject)
 			projects.GET("", projectHandler.ListProjects)
+			projects.GET("/:id/status", projectHandler.GetProjectStatus)
 			projects.DELETE("/:id", projectHandler.DeleteProject)
 		}
 	}

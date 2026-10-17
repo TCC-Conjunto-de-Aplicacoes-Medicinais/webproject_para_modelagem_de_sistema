@@ -78,3 +78,26 @@ func (h *ProjectHandler) DeleteProject(c *gin.Context) {
 
 	c.JSON(http.StatusOK, gin.H{"message": "Project deleted successfully"})
 }
+
+func (h *ProjectHandler) GetProjectStatus(c *gin.Context) {
+	tenantID, exists := c.Get("tenant_id")
+	if !exists {
+		c.JSON(http.StatusUnauthorized, gin.H{"error": "Unauthorized"})
+		return
+	}
+
+	projectID := c.Param("id")
+	if projectID == "" {
+		c.JSON(http.StatusBadRequest, gin.H{"error": "Project ID is required"})
+		return
+	}
+
+	status, err := h.projectService.GetProjectStatus(c.Request.Context(), tenantID.(string), projectID)
+	if err != nil {
+		c.JSON(http.StatusInternalServerError, gin.H{"error": err.Error()})
+		return
+	}
+
+	c.JSON(http.StatusOK, status)
+}
+

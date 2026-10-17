@@ -266,7 +266,7 @@ interface SystemConfigContextType {
   updateImplementation: (payload: Partial<ImplementationConfig>) => void;
   reset: () => void;
   generateBlueprint: () => SystemBlueprint;
-  saveProject: () => Promise<SystemBlueprint>;
+  saveProject: (customBlueprint?: SystemBlueprint) => Promise<SystemBlueprint>;
   deleteProject: (id: string) => Promise<void>;
   goNext: () => void;
   goBack: () => void;
@@ -350,9 +350,9 @@ export function SystemConfigProvider({ children }: SystemConfigProviderProps) {
     };
   }, [state]);
 
-  const saveProject = useCallback(async (): Promise<SystemBlueprint> => {
+  const saveProject = useCallback(async (customBlueprint?: SystemBlueprint): Promise<SystemBlueprint> => {
     if (!token) throw new Error('Não autorizado');
-    const blueprint = generateBlueprint();
+    const blueprint = customBlueprint || generateBlueprint();
     await saveProjectToApi(token, blueprint);
     dispatch({ type: 'SAVE_PROJECT', project: blueprint });
     return blueprint;

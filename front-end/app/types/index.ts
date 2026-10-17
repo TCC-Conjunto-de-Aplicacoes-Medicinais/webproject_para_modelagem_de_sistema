@@ -5,6 +5,7 @@ export enum PageRoute {
   LOGIN = 'login',
   REGISTER = 'register',
   VERIFY = 'verify',
+  RESET_PASSWORD = 'reset-password',
   SYSTEM_CREATION = 'system-creation',
 }
 
@@ -57,7 +58,7 @@ export type SystemCreationMode = 'guided';
 export type PaletteOption = 'green' | 'blue' | 'red';
 export type LogoType = 'custom' | 'generic';
 export type DeploymentType = 'web' | 'desktop';
-export type EnvironmentType = 'aws' | 'azure' | 'local';
+export type EnvironmentType = 'aws' | 'local';
 export type AssistantScope = 'global' | 'per-doctor';
 export type ImplementationType = 'managed';
 
