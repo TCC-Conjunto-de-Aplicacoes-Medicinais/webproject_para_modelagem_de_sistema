@@ -14,6 +14,7 @@ import Alert from '@mui/material/Alert';
 import Tooltip from '@mui/material/Tooltip';
 import Collapse from '@mui/material/Collapse';
 import Divider from '@mui/material/Divider';
+import Chip from '@mui/material/Chip';
 import InfoOutlinedIcon from '@mui/icons-material/InfoOutlined';
 import LanguageIcon from '@mui/icons-material/Language';
 import DesktopWindowsIcon from '@mui/icons-material/DesktopWindows';
@@ -357,6 +358,66 @@ export default function StepTechnical() {
               configuração durante a etapa de implementação.
             </Typography>
           </Alert>
+        </Collapse>
+
+        {/* AWS FinOps Details */}
+        <Collapse in={technical.environment === 'aws'}>
+          <Box
+            sx={{
+              mt: 2,
+              p: 2.5,
+              borderRadius: 2,
+              border: '1px solid',
+              borderColor: `${accentColor}40`,
+              backgroundColor: isDark ? 'rgba(0,200,83,0.04)' : 'rgba(0,200,83,0.02)',
+            }}
+          >
+            <Box sx={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', mb: 1.5, flexWrap: 'wrap', gap: 1 }}>
+              <Box sx={{ display: 'flex', alignItems: 'center', gap: 1 }}>
+                <CloudIcon sx={{ fontSize: 22, color: accentColor }} />
+                <Typography variant="subtitle2" sx={{ fontWeight: 700, color: 'text.primary' }}>
+                  Detalhamento de Custos AWS (Região us-east-1)
+                </Typography>
+              </Box>
+              <Chip label="Cotação Oficial da Nuvem" size="small" sx={{ bgcolor: `${accentColor}18`, color: accentColor, fontWeight: 700, fontSize: '0.72rem' }} />
+            </Box>
+
+            <Typography variant="body2" sx={{ color: 'text.secondary', mb: 2, fontSize: '0.84rem', lineHeight: 1.6 }}>
+              A infraestrutura provisionada pelo motor Terraform consome recursos dedicados e escaláveis:
+            </Typography>
+
+            <Box sx={{ display: 'grid', gridTemplateColumns: { xs: '1fr', sm: '1fr 1fr' }, gap: 1.5, mb: 2 }}>
+              <Box sx={{ p: 1.5, borderRadius: 1.5, bgcolor: isDark ? 'rgba(255,255,255,0.03)' : 'rgba(0,0,0,0.02)', border: '1px solid', borderColor: 'divider' }}>
+                <Typography variant="caption" sx={{ color: 'text.secondary', fontWeight: 600 }}>1. Computação (EC2)</Typography>
+                <Typography variant="body2" sx={{ fontWeight: 700, color: 'text.primary' }}>Instância t3.small (2GB RAM)</Typography>
+                <Typography variant="caption" sx={{ color: 'text.secondary' }}>US$ 0,0208 / hora ativa (~R$ 82,00 / mês)</Typography>
+              </Box>
+              <Box sx={{ p: 1.5, borderRadius: 1.5, bgcolor: isDark ? 'rgba(255,255,255,0.03)' : 'rgba(0,0,0,0.02)', border: '1px solid', borderColor: 'divider' }}>
+                <Typography variant="caption" sx={{ color: 'text.secondary', fontWeight: 600 }}>2. Balanceador de Carga</Typography>
+                <Typography variant="body2" sx={{ fontWeight: 700, color: 'text.primary' }}>Application Load Balancer (ALB)</Typography>
+                <Typography variant="caption" sx={{ color: 'text.secondary' }}>US$ 0,0225 / hora ativa (~R$ 89,00 / mês)</Typography>
+              </Box>
+              <Box sx={{ p: 1.5, borderRadius: 1.5, bgcolor: isDark ? 'rgba(255,255,255,0.03)' : 'rgba(0,0,0,0.02)', border: '1px solid', borderColor: 'divider' }}>
+                <Typography variant="caption" sx={{ color: 'text.secondary', fontWeight: 600 }}>3. Armazenamento EBS NVMe</Typography>
+                <Typography variant="body2" sx={{ fontWeight: 700, color: 'text.primary' }}>Disco 20 GB gp3 SSD</Typography>
+                <Typography variant="caption" sx={{ color: 'text.secondary' }}>US$ 1,60 fixo (~R$ 9,00 / mês)</Typography>
+              </Box>
+              <Box sx={{ p: 1.5, borderRadius: 1.5, bgcolor: isDark ? 'rgba(255,255,255,0.03)' : 'rgba(0,0,0,0.02)', border: '1px solid', borderColor: 'divider' }}>
+                <Typography variant="caption" sx={{ color: 'text.secondary', fontWeight: 600 }}>4. Vault & FinOps</Typography>
+                <Typography variant="body2" sx={{ fontWeight: 700, color: accentColor }}>Auto-Teardown TTL 5m</Typography>
+                <Typography variant="caption" sx={{ color: 'text.secondary' }}>~R$ 0,02 por ciclo de demonstração</Typography>
+              </Box>
+            </Box>
+
+            <Box sx={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', pt: 1, borderTop: '1px solid', borderColor: 'divider', flexWrap: 'wrap', gap: 1 }}>
+              <Typography variant="caption" sx={{ color: 'text.secondary', fontWeight: 500 }}>
+                Custo computacional total estimado na AWS:
+              </Typography>
+              <Typography variant="body2" sx={{ fontWeight: 800, color: accentColor }}>
+                US$ 0,046/h (~R$ 0,26/h) | R$ 189,00/mês
+              </Typography>
+            </Box>
+          </Box>
         </Collapse>
       </Box>
 
@@ -733,7 +794,7 @@ export default function StepTechnical() {
             { label: 'Plano base', value: price.base, desc: technical.deploymentType === 'web' ? 'Site' : 'Desktop' },
             { label: `Módulos (${moduleCount} ativos)`, value: price.modules, desc: `${moduleCount} × R$ 49` },
             { label: 'Dimensionamento', value: price.sizing, desc: `~${avgPatients} pac. / ${technical.sizing.avgDoctors} méd.` },
-            ...(price.environment > 0 ? [{ label: 'Ambiente cloud', value: price.environment, desc: 'Amazon AWS' }] : []),
+            ...(price.environment > 0 ? [{ label: 'Ambiente Cloud AWS', value: price.environment, desc: 'EC2 t3.small + ALB + EBS gp3 (R$ 0,26/h)' }] : []),
             ...(price.dr > 0 ? [{ label: 'Alta disponibilidade', value: price.dr, desc: 'Terraform + DR' }] : []),
           ].map((item, i) => (
             <Box
