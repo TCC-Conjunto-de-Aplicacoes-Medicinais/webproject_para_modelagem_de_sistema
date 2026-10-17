@@ -28,7 +28,10 @@ import DeleteOutlineIcon from '@mui/icons-material/DeleteOutline';
 import FolderIcon from '@mui/icons-material/Folder';
 import PaletteIcon from '@mui/icons-material/Palette';
 import ExtensionIcon from '@mui/icons-material/Extension';
-import CalendarTodayIcon from '@mui/icons-material/CalendarToday';
+import VisibilityIcon from '@mui/icons-material/Visibility';
+import OpenInNewIcon from '@mui/icons-material/OpenInNew';
+import DnsIcon from '@mui/icons-material/Dns';
+import SecurityIcon from '@mui/icons-material/Security';
 import { SystemConfigProvider, useSystemConfig } from '@/app/contexts/SystemConfigContext';
 import { useAuth } from '@/app/contexts/AuthContext';
 import { useNavigation } from '@/app/contexts/NavigationContext';
@@ -49,8 +52,11 @@ function ProjectList({ onCreateNew }: { onCreateNew: () => void }) {
   const [deletePassword, setDeletePassword] = useState('');
   const [deleteError, setDeleteError] = useState('');
 
+  // ─── Project Details Modal State ───
+  const [selectedDetails, setSelectedDetails] = useState<SystemBlueprint | null>(null);
+
   function getPaletteLabel(palette: string): string {
-    const map: Record<string, string> = { green: 'Verde', blue: 'Azul', red: 'Vermelho' };
+    const map: Record<string, string> = { green: 'Verde Esmeralda', blue: 'Azul Profissional', red: 'Vermelho Vibrante' };
     return map[palette] || palette;
   }
 
@@ -70,7 +76,7 @@ function ProjectList({ onCreateNew }: { onCreateNew: () => void }) {
         Seus Projetos
       </Typography>
       <Typography variant="body2" sx={{ color: 'text.secondary', mb: 3 }}>
-        Sistemas que você já configurou.
+        Sistemas configurados e gerados pelo motor IaC.
       </Typography>
 
       <Box sx={{ display: 'flex', flexDirection: 'column', gap: 2, mb: 3 }}>
@@ -85,8 +91,8 @@ function ProjectList({ onCreateNew }: { onCreateNew: () => void }) {
             }}
           >
             <CardContent sx={{ p: 2.5, '&:last-child': { pb: 2.5 } }}>
-              <Box sx={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start' }}>
-                <Box sx={{ flex: 1 }}>
+              <Box sx={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', flexWrap: 'wrap', gap: 2 }}>
+                <Box sx={{ flex: 1, minWidth: 260 }}>
                   <Box sx={{ display: 'flex', alignItems: 'center', gap: 1.5, mb: 1 }}>
                     <FolderIcon sx={{ color: accentColor, fontSize: 22 }} />
                     <Typography variant="body1" sx={{ fontWeight: 700, color: 'text.primary' }}>
@@ -94,7 +100,7 @@ function ProjectList({ onCreateNew }: { onCreateNew: () => void }) {
                     </Typography>
                   </Box>
 
-                  <Box sx={{ display: 'flex', gap: 2, flexWrap: 'wrap', mb: 1 }}>
+                  <Box sx={{ display: 'flex', gap: 2, flexWrap: 'wrap', mb: 1.5 }}>
                     <Box sx={{ display: 'flex', alignItems: 'center', gap: 0.5 }}>
                       <PaletteIcon sx={{ fontSize: 14, color: 'text.secondary' }} />
                       <Typography variant="caption" sx={{ color: 'text.secondary' }}>
@@ -104,7 +110,7 @@ function ProjectList({ onCreateNew }: { onCreateNew: () => void }) {
                     <Box sx={{ display: 'flex', alignItems: 'center', gap: 0.5 }}>
                       <ExtensionIcon sx={{ fontSize: 14, color: 'text.secondary' }} />
                       <Typography variant="caption" sx={{ color: 'text.secondary' }}>
-                        {getModuleCount(project)} módulos
+                        {getModuleCount(project)} módulos ativos
                       </Typography>
                     </Box>
                     <Box sx={{ display: 'flex', alignItems: 'center', gap: 0.5 }}>
@@ -115,42 +121,72 @@ function ProjectList({ onCreateNew }: { onCreateNew: () => void }) {
                     </Box>
                   </Box>
 
-                  <Box sx={{ display: 'flex', gap: 0.5, flexWrap: 'wrap' }}>
+                  <Box sx={{ display: 'flex', gap: 0.8, flexWrap: 'wrap' }}>
                     {project.modules.doctor.enabled && (
-                      <Chip label="Médico" size="small" sx={{ fontSize: '0.65rem', height: 22, backgroundColor: `${accentColor}12`, color: accentColor, fontWeight: 600 }} />
+                      <Chip label="Médico" size="small" sx={{ fontSize: '0.7rem', height: 24, backgroundColor: `${accentColor}15`, color: accentColor, fontWeight: 600 }} />
                     )}
                     {project.modules.assistant.enabled && (
-                      <Chip label="Assistente" size="small" sx={{ fontSize: '0.65rem', height: 22, backgroundColor: `${accentColor}12`, color: accentColor, fontWeight: 600 }} />
+                      <Chip label="Assistente" size="small" sx={{ fontSize: '0.7rem', height: 24, backgroundColor: `${accentColor}15`, color: accentColor, fontWeight: 600 }} />
                     )}
                     {project.modules.management.enabled && (
-                      <Chip label="Gerencial" size="small" sx={{ fontSize: '0.65rem', height: 22, backgroundColor: `${accentColor}12`, color: accentColor, fontWeight: 600 }} />
+                      <Chip label="Gerencial" size="small" sx={{ fontSize: '0.7rem', height: 24, backgroundColor: `${accentColor}15`, color: accentColor, fontWeight: 600 }} />
                     )}
                     <Chip
                       label={`R$ ${project.technical.estimatedPrice.monthly.toLocaleString('pt-BR')}/mês`}
                       size="small"
                       sx={{
-                        fontSize: '0.65rem',
-                        height: 22,
+                        fontSize: '0.7rem',
+                        height: 24,
                         fontWeight: 700,
                         backgroundColor: isDark ? 'rgba(255,255,255,0.06)' : 'rgba(0,0,0,0.05)',
                         color: 'text.primary',
                       }}
                     />
+                    <Chip
+                      label={project.technical.environment === 'aws' ? 'Nuvem AWS' : 'Sandbox Local'}
+                      size="small"
+                      sx={{
+                        fontSize: '0.7rem',
+                        height: 24,
+                        fontWeight: 600,
+                        backgroundColor: 'rgba(59, 130, 246, 0.1)',
+                        color: '#60A5FA',
+                      }}
+                    />
                   </Box>
                 </Box>
 
-                <Tooltip title="Excluir projeto">
-                  <IconButton
-                    onClick={() => setDeleteDialog({ open: true, id: project.id, name: project.identity.clinicName || 'Sistema sem nome' })}
+                <Box sx={{ display: 'flex', alignItems: 'center', gap: 1 }}>
+                  <Button
+                    variant="outlined"
                     size="small"
+                    startIcon={<VisibilityIcon />}
+                    onClick={() => setSelectedDetails(project)}
                     sx={{
-                      color: 'text.secondary',
-                      '&:hover': { color: 'error.main', backgroundColor: 'rgba(244,67,54,0.08)' },
+                      textTransform: 'none',
+                      fontWeight: 600,
+                      borderRadius: 2,
+                      borderColor: isDark ? 'grey.700' : 'grey.300',
+                      color: 'text.primary',
+                      '&:hover': { borderColor: accentColor, backgroundColor: `${accentColor}10` },
                     }}
                   >
-                    <DeleteOutlineIcon fontSize="small" />
-                  </IconButton>
-                </Tooltip>
+                    Ver Solicitação
+                  </Button>
+
+                  <Tooltip title="Excluir projeto">
+                    <IconButton
+                      onClick={() => setDeleteDialog({ open: true, id: project.id, name: project.identity.clinicName || 'Sistema sem nome' })}
+                      size="small"
+                      sx={{
+                        color: 'text.secondary',
+                        '&:hover': { color: 'error.main', backgroundColor: 'rgba(244,67,54,0.08)' },
+                      }}
+                    >
+                      <DeleteOutlineIcon fontSize="small" />
+                    </IconButton>
+                  </Tooltip>
+                </Box>
               </Box>
             </CardContent>
           </Card>
@@ -158,17 +194,195 @@ function ProjectList({ onCreateNew }: { onCreateNew: () => void }) {
       </Box>
 
       <Button
-        variant="outlined"
+        variant="contained"
+        color="secondary"
         startIcon={<AddIcon />}
         onClick={onCreateNew}
         sx={{
-          borderColor: isDark ? 'grey.700' : 'grey.300',
-          color: 'text.primary',
-          '&:hover': { borderColor: 'secondary.main' },
+          fontWeight: 700,
+          borderRadius: 2.5,
+          px: 3,
+          py: 1,
         }}
       >
         Criar novo sistema
       </Button>
+
+      {/* ─── Modal de Detalhes da Solicitação ─── */}
+      <Dialog
+        open={!!selectedDetails}
+        onClose={() => setSelectedDetails(null)}
+        maxWidth="md"
+        fullWidth
+        PaperProps={{ sx: { borderRadius: 3, p: { xs: 2, sm: 3 } } }}
+      >
+        {selectedDetails && (
+          <>
+            <DialogTitle sx={{ fontWeight: 800, fontSize: '1.4rem', color: 'text.primary', pb: 1, display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+              <Box sx={{ display: 'flex', alignItems: 'center', gap: 1.5 }}>
+                <FolderIcon sx={{ color: accentColor, fontSize: 28 }} />
+                <span>Solicitação: {selectedDetails.identity.clinicName}</span>
+              </Box>
+              <Chip
+                label={selectedDetails.technical.environment === 'aws' ? 'Nuvem AWS Dedicada' : 'Sandbox Local'}
+                color="primary"
+                size="small"
+                sx={{ fontWeight: 700 }}
+              />
+            </DialogTitle>
+
+            <DialogContent dividers sx={{ display: 'flex', flexDirection: 'column', gap: 3, my: 1 }}>
+              {/* 1. Identidade */}
+              <Box>
+                <Typography variant="subtitle2" sx={{ fontWeight: 700, color: 'text.secondary', textTransform: 'uppercase', letterSpacing: '0.05em', mb: 1 }}>
+                  1. Identidade & Marca
+                </Typography>
+                <Box sx={{ p: 2, borderRadius: 2, backgroundColor: isDark ? 'rgba(255,255,255,0.03)' : 'rgba(0,0,0,0.02)', border: '1px solid', borderColor: 'divider' }}>
+                  <Typography variant="body2" sx={{ mb: 0.5 }}>
+                    <strong>Nome da Clínica:</strong> {selectedDetails.identity.clinicName}
+                  </Typography>
+                  <Typography variant="body2" sx={{ mb: 0.5 }}>
+                    <strong>Paleta Visual:</strong> {getPaletteLabel(selectedDetails.identity.palette)}
+                  </Typography>
+                  <Typography variant="body2">
+                    <strong>ID do Blueprint:</strong> <code style={{ fontSize: '0.8rem' }}>{selectedDetails.id}</code>
+                  </Typography>
+                </Box>
+              </Box>
+
+              {/* 2. Módulos & Recursos */}
+              <Box>
+                <Typography variant="subtitle2" sx={{ fontWeight: 700, color: 'text.secondary', textTransform: 'uppercase', letterSpacing: '0.05em', mb: 1 }}>
+                  2. Módulos & Recursos Homologados
+                </Typography>
+                <Grid container spacing={2}>
+                  {/* Médico */}
+                  <Grid size={{ xs: 12, md: 4 }}>
+                    <Card sx={{ height: '100%', border: '1px solid', borderColor: selectedDetails.modules.doctor.enabled ? accentColor : 'divider' }}>
+                      <CardContent sx={{ p: 2 }}>
+                        <Typography variant="subtitle1" sx={{ fontWeight: 700, color: selectedDetails.modules.doctor.enabled ? accentColor : 'text.disabled', mb: 1 }}>
+                          Módulo Médico {selectedDetails.modules.doctor.enabled ? '✓' : '(Inativo)'}
+                        </Typography>
+                        {selectedDetails.modules.doctor.enabled && (
+                          <Box sx={{ display: 'flex', flexDirection: 'column', gap: 0.4, fontSize: '0.8rem', color: 'text.secondary' }}>
+                            <span>• Prontuário Eletrônico</span>
+                            <span>• IA para Análise de ECG (SaMD)</span>
+                            <span>• Prescrição com Assinatura Digital</span>
+                            <span>• Histórico e Agenda Clínica</span>
+                          </Box>
+                        )}
+                      </CardContent>
+                    </Card>
+                  </Grid>
+
+                  {/* Assistente */}
+                  <Grid size={{ xs: 12, md: 4 }}>
+                    <Card sx={{ height: '100%', border: '1px solid', borderColor: selectedDetails.modules.assistant.enabled ? accentColor : 'divider' }}>
+                      <CardContent sx={{ p: 2 }}>
+                        <Typography variant="subtitle1" sx={{ fontWeight: 700, color: selectedDetails.modules.assistant.enabled ? accentColor : 'text.disabled', mb: 1 }}>
+                          Módulo Assistente {selectedDetails.modules.assistant.enabled ? '✓' : '(Inativo)'}
+                        </Typography>
+                        {selectedDetails.modules.assistant.enabled && (
+                          <Box sx={{ display: 'flex', flexDirection: 'column', gap: 0.4, fontSize: '0.8rem', color: 'text.secondary' }}>
+                            <span>• Agendamento & Recepção</span>
+                            <span>• Gestão de Pacientes</span>
+                            <span>• Convênios & Faturamento</span>
+                            <span>• Visão de Agenda Médica</span>
+                          </Box>
+                        )}
+                      </CardContent>
+                    </Card>
+                  </Grid>
+
+                  {/* Gerencial */}
+                  <Grid size={{ xs: 12, md: 4 }}>
+                    <Card sx={{ height: '100%', border: '1px solid', borderColor: selectedDetails.modules.management.enabled ? accentColor : 'divider' }}>
+                      <CardContent sx={{ p: 2 }}>
+                        <Typography variant="subtitle1" sx={{ fontWeight: 700, color: selectedDetails.modules.management.enabled ? accentColor : 'text.disabled', mb: 1 }}>
+                          Módulo Gerencial {selectedDetails.modules.management.enabled ? '✓' : '(Inativo)'}
+                        </Typography>
+                        {selectedDetails.modules.management.enabled && (
+                          <Box sx={{ display: 'flex', flexDirection: 'column', gap: 0.4, fontSize: '0.8rem', color: 'text.secondary' }}>
+                            <span>• Controle de Corpo Clínico</span>
+                            <span>• Controle de Faturamento e Custos</span>
+                            <span>• Dashboards de Desempenho</span>
+                            <span>• Gestão de Presença</span>
+                          </Box>
+                        )}
+                      </CardContent>
+                    </Card>
+                  </Grid>
+                </Grid>
+              </Box>
+
+              {/* 3. Dimensionamento e Nuvem */}
+              <Box>
+                <Typography variant="subtitle2" sx={{ fontWeight: 700, color: 'text.secondary', textTransform: 'uppercase', letterSpacing: '0.05em', mb: 1 }}>
+                  3. Dimensionamento & Infraestrutura
+                </Typography>
+                <Box sx={{ p: 2, borderRadius: 2, backgroundColor: isDark ? 'rgba(255,255,255,0.03)' : 'rgba(0,0,0,0.02)', border: '1px solid', borderColor: 'divider' }}>
+                  <Grid container spacing={2}>
+                    <Grid size={{ xs: 6, sm: 3 }}>
+                      <Typography variant="caption" sx={{ color: 'text.secondary' }}>Médicos Ativos</Typography>
+                      <Typography variant="body1" sx={{ fontWeight: 700 }}>{selectedDetails.technical.sizing.avgDoctors}</Typography>
+                    </Grid>
+                    <Grid size={{ xs: 6, sm: 3 }}>
+                      <Typography variant="caption" sx={{ color: 'text.secondary' }}>Assistentes</Typography>
+                      <Typography variant="body1" sx={{ fontWeight: 700 }}>{selectedDetails.technical.sizing.avgAssistants}</Typography>
+                    </Grid>
+                    <Grid size={{ xs: 6, sm: 3 }}>
+                      <Typography variant="caption" sx={{ color: 'text.secondary' }}>Média de Pacientes</Typography>
+                      <Typography variant="body1" sx={{ fontWeight: 700 }}>~{Math.ceil((selectedDetails.technical.sizing.minPatients + selectedDetails.technical.sizing.maxPatients) / 2)}</Typography>
+                    </Grid>
+                    <Grid size={{ xs: 6, sm: 3 }}>
+                      <Typography variant="caption" sx={{ color: 'text.secondary' }}>Alta Disp. (DR)</Typography>
+                      <Typography variant="body1" sx={{ fontWeight: 700 }}>{selectedDetails.technical.hasDisasterRecovery ? 'Sim (Multi-AZ)' : 'Não'}</Typography>
+                    </Grid>
+                  </Grid>
+                </Box>
+              </Box>
+
+              {/* 4. Valores */}
+              <Box sx={{ p: 2.5, borderRadius: 2.5, backgroundColor: `${accentColor}10`, border: `1px solid ${accentColor}30` }}>
+                <Box sx={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', flexWrap: 'wrap', gap: 2 }}>
+                  <Box>
+                    <Typography variant="caption" sx={{ color: 'text.secondary' }}>Investimento Mensal Estimado</Typography>
+                    <Typography variant="h4" sx={{ fontWeight: 800, color: accentColor }}>
+                      R$ {selectedDetails.technical.estimatedPrice.monthly.toLocaleString('pt-BR')} / mês
+                    </Typography>
+                  </Box>
+                  <Box>
+                    <Typography variant="caption" sx={{ color: 'text.secondary' }}>Taxa de Implantação e Validação</Typography>
+                    <Typography variant="h5" sx={{ fontWeight: 700, color: 'text.primary' }}>
+                      R$ {selectedDetails.technical.estimatedPrice.setup.toLocaleString('pt-BR')} (único)
+                    </Typography>
+                  </Box>
+                </Box>
+              </Box>
+            </DialogContent>
+
+            <DialogActions sx={{ px: 3, py: 2, display: 'flex', justifyContent: 'space-between' }}>
+              <Button
+                variant="contained"
+                color="primary"
+                startIcon={<OpenInNewIcon />}
+                onClick={() => window.open('http://localhost:3001', '_blank')}
+                sx={{ fontWeight: 700, borderRadius: 2 }}
+              >
+                Abrir Sistema da Clínica
+              </Button>
+              <Button
+                variant="outlined"
+                color="inherit"
+                onClick={() => setSelectedDetails(null)}
+                sx={{ borderRadius: 2 }}
+              >
+                Fechar
+              </Button>
+            </DialogActions>
+          </>
+        )}
+      </Dialog>
 
       {/* ─── Delete Confirmation Dialog ─── */}
       <Dialog
@@ -235,7 +449,7 @@ function ProjectList({ onCreateNew }: { onCreateNew: () => void }) {
 // ─── Inner Page (inside provider) ───────────────────────
 
 function SystemCreationContent() {
-  const { state } = useSystemConfig();
+  const { state, reset } = useSystemConfig();
   const { isAuthenticated, isLoading } = useAuth();
   const { navigateTo } = useNavigation();
   const [showWizard, setShowWizard] = useState(false);
@@ -243,6 +457,11 @@ function SystemCreationContent() {
   const isDark = theme.palette.mode === 'dark';
 
   const hasProjects = state.projects.length > 0;
+
+  const handleStartWizard = () => {
+    reset();
+    setShowWizard(true);
+  };
 
   if (isLoading) {
     return <Box sx={{ display: 'flex', justifyContent: 'center', py: 10 }}><CircularProgress color="secondary" /></Box>;
@@ -280,7 +499,10 @@ function SystemCreationContent() {
             <Button
               variant="text"
               startIcon={<Box component="span">←</Box>}
-              onClick={() => setShowWizard(false)}
+              onClick={() => {
+                reset();
+                setShowWizard(false);
+              }}
               sx={{
                 color: 'text.secondary',
                 '&:hover': { color: 'text.primary' },
@@ -289,7 +511,10 @@ function SystemCreationContent() {
               Voltar
             </Button>
           </Box>
-          <GuidedWizard onComplete={() => setShowWizard(false)} />
+          <GuidedWizard onComplete={() => {
+            reset();
+            setShowWizard(false);
+          }} />
         </Box>
       </Fade>
     );
@@ -336,7 +561,7 @@ function SystemCreationContent() {
       </Box>
 
       {/* Project List (if any) */}
-      <ProjectList onCreateNew={() => setShowWizard(true)} />
+      <ProjectList onCreateNew={handleStartWizard} />
 
       {/* Guided Mode Card */}
       {!hasProjects && (
@@ -367,7 +592,7 @@ function SystemCreationContent() {
                 }}
               />
               <CardActionArea
-                onClick={() => setShowWizard(true)}
+                onClick={handleStartWizard}
                 sx={{ p: 0 }}
               >
                 <CardContent sx={{ p: 4, textAlign: 'center' }}>
