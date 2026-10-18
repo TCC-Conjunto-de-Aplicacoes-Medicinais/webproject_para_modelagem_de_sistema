@@ -47,9 +47,17 @@ export default function StepIdentity() {
 
       const reader = new FileReader();
       reader.onload = () => {
+        const logoData = reader.result as string;
+        if (typeof window !== 'undefined') {
+          try {
+            localStorage.setItem('clinic_custom_logo', logoData);
+          } catch (e) {
+            console.warn('Could not cache logo in localStorage', e);
+          }
+        }
         updateIdentity({
           logoType: 'custom',
-          logoFile: reader.result as string,
+          logoFile: logoData,
           logoFileName: file.name,
         });
       };
@@ -67,6 +75,11 @@ export default function StepIdentity() {
   });
 
   const handleRemoveLogo = () => {
+    if (typeof window !== 'undefined') {
+      try {
+        localStorage.removeItem('clinic_custom_logo');
+      } catch (e) {}
+    }
     updateIdentity({
       logoType: 'generic',
       logoFile: null,

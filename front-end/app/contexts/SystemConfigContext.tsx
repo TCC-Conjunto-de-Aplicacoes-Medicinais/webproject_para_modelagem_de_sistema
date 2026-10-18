@@ -341,8 +341,9 @@ export function SystemConfigProvider({ children }: SystemConfigProviderProps) {
       createdAt: now.toISOString(),
       identity: {
         ...state.identity,
-        // Remove base64 logo data from blueprint to reduce size
-        logoFile: state.identity.logoType === 'custom' ? '[LOGO_UPLOADED]' : null,
+        logoFile: state.identity.logoType === 'custom' 
+          ? (state.identity.logoFile || (typeof window !== 'undefined' ? localStorage.getItem('clinic_custom_logo') : null))
+          : null,
       },
       modules: state.modules,
       technical: state.technical,
