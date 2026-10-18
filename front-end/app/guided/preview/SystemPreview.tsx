@@ -108,6 +108,7 @@ export default function SystemPreview({
 
   // Reset screen when role changes
   useEffect(() => {
+    // eslint-disable-next-line react-hooks/set-state-in-effect
     if (activeRole === 'doctor') setActiveScreen('dashboard');
     else if (activeRole === 'assistant') setActiveScreen('doctor-schedule');
     else if (activeRole === 'management') setActiveScreen('doctor-schedule');

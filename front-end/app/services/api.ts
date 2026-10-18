@@ -63,6 +63,10 @@ async function fetchWithConfig(endpoint: string, config: RequestInit = {}): Prom
                 Authorization: `Bearer ${newAccessToken}`,
               };
               return fetchWithConfig(endpoint, { ...config, headers: newHeaders });
+            } else {
+              // Token expirou ou foi revogado no Keycloak
+              localStorage.removeItem('openhealth_token');
+              localStorage.removeItem('openhealth_refresh_token');
             }
           } catch {
             isRefreshing = false;

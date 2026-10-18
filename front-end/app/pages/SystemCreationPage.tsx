@@ -451,7 +451,7 @@ function ProjectList({ onCreateNew }: { onCreateNew: () => void }) {
 
 function SystemCreationContent() {
   const { state, reset } = useSystemConfig();
-  const { isAuthenticated, isLoading } = useAuth();
+  const { isAuthenticated, isVerified, isLoading } = useAuth();
   const { navigateTo } = useNavigation();
   const [showWizard, setShowWizard] = useState(false);
   const theme = useTheme();
@@ -479,7 +479,6 @@ function SystemCreationContent() {
     );
   }
 
-  const { isVerified } = useAuth();
   if (isAuthenticated && !isVerified) {
     return (
       <Box sx={{ textAlign: 'center', py: 10 }}>

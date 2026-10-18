@@ -118,7 +118,7 @@ function ProvisioningProgressDialog({
     }
   }, [open]);
 
-  // Transição visual progressiva das etapas conforme o tempo transcorrido
+  // Watchdog de convergência e transição visual progressiva das etapas
   useEffect(() => {
     if (!open || isCompleted || isFailed) return;
 
@@ -128,23 +128,83 @@ function ProvisioningProgressDialog({
       else if (seconds < 45) setCurrentStep(2);
       else if (seconds < 160) setCurrentStep(3);
       else setCurrentStep(4);
+
+      if (seconds > 300) {
+        setIsFailed(true);
+        setErrorMessage('Tempo limite de convergência da infraestrutura na AWS excedido (5 minutos). Verifique os logs do motor de provisionamento.');
+      }
     } else {
       if (seconds < 3) setCurrentStep(1);
       else if (seconds < 8) setCurrentStep(2);
       else if (seconds < 16) setCurrentStep(3);
       else setCurrentStep(4);
+
+      if (seconds > 45) {
+        // Tenta sonda final na porta 3001
+        fetch('http://localhost:3001', { method: 'HEAD', mode: 'no-cors' })
+          .then(() => {
+            setIsCompleted(true);
+            setCurrentStep(5);
+            setResolvedClinicUrl('http://localhost:3001');
+          })
+          .catch(() => {
+            setIsFailed(true);
+            setErrorMessage('A sonda de health check excedeu o tempo limite (45s). Verifique se o motor local está ativo na porta 8082.');
+          });
+      }
     }
   }, [seconds, environment, open, isCompleted, isFailed]);
 
-  // Polling em tempo real do status da infraestrutura no back-end / motor IaC
+  // Polling em tempo real do status da infraestrutura e Sonda Direta de Saúde
   useEffect(() => {
     if (!open || isCompleted || isFailed) return;
 
     let isMounted = true;
-    const pollInterval = setInterval(async () => {
+    let authErrorCount = 0;
+
+    const checkConvergence = async () => {
+      // 1. Sonda direta de Health Check para Ambiente Local
+      if (environment === 'local') {
+        try {
+          const directHealth = await fetch('http://localhost:8081/health', { method: 'GET', mode: 'cors' })
+            .catch(() => null);
+          if (directHealth && directHealth.ok) {
+            if (!isMounted) return;
+            setIsCompleted(true);
+            setCurrentStep(5);
+            setResolvedClinicUrl('http://localhost:3001');
+            setStatusMessage('Clínica local provisionada e respondendo na porta 3001 (HTTP 200 na rota /health).');
+            return;
+          }
+
+          // Se a porta 3001 Next.js já responde
+          const directFront = await fetch('http://localhost:3001', { method: 'HEAD', mode: 'no-cors' })
+            .catch(() => null);
+          if (directFront) {
+            if (!isMounted) return;
+            setIsCompleted(true);
+            setCurrentStep(5);
+            setResolvedClinicUrl('http://localhost:3001');
+            setStatusMessage('Interface da clínica local ativa em http://localhost:3001.');
+            return;
+          }
+        } catch {
+          // Continua para o polling via backend
+        }
+      }
+
+      // 2. Consulta de status via API do Wizard
       const projId = blueprint?.id;
       const activeToken = token || (typeof window !== 'undefined' ? localStorage.getItem('openhealth_token') : null);
-      if (!projId || !activeToken) return;
+
+      if (!projId || !activeToken) {
+        if (environment === 'local') {
+          return;
+        }
+        setIsFailed(true);
+        setErrorMessage('Sessão não autenticada. Faça login novamente.');
+        return;
+      }
 
       try {
         const res = await api.getProjectStatus(activeToken, projId);
@@ -170,14 +230,42 @@ function ProvisioningProgressDialog({
         }
       } catch (err: any) {
         console.warn('Polling status temporariamente indisponível (tentando novamente):', err?.message || err);
+        const isAuthError = err?.status === 401 || err?.message?.includes('401') || err?.message?.includes('Token');
+        if (isAuthError) {
+          authErrorCount++;
+          if (authErrorCount >= 3) {
+            if (environment === 'local') {
+              fetch('http://localhost:3001', { method: 'HEAD', mode: 'no-cors' })
+                .then(() => {
+                  if (isMounted) {
+                    setIsCompleted(true);
+                    setCurrentStep(5);
+                    setResolvedClinicUrl('http://localhost:3001');
+                  }
+                })
+                .catch(() => {
+                  if (isMounted) {
+                    setIsFailed(true);
+                    setErrorMessage('Sua sessão de autenticação expirou. Faça login novamente para acompanhar o provisionamento.');
+                  }
+                });
+            } else {
+              setIsFailed(true);
+              setErrorMessage('Sua sessão de autenticação expirou. Faça login novamente para acompanhar o provisionamento.');
+            }
+          }
+        }
       }
-    }, 4000);
+    };
+
+    checkConvergence();
+    const pollInterval = setInterval(checkConvergence, 3500);
 
     return () => {
       isMounted = false;
       clearInterval(pollInterval);
     };
-  }, [open, isCompleted, isFailed, blueprint?.id, token]);
+  }, [open, isCompleted, isFailed, blueprint?.id, token, environment]);
 
   const formatTime = (s: number) => {
     const mins = Math.floor(s / 60);
@@ -622,9 +710,12 @@ export default function StepFinalization({ onComplete }: StepFinalizationProps) 
       setShowProgressModal(true);
     } catch (err: any) {
       console.error('Falha ao salvar projeto no backend:', err);
-      const fallbackBlueprint = generateBlueprint();
-      setCreatedBlueprint(fallbackBlueprint);
-      setShowProgressModal(true);
+      const isAuthError = err?.status === 401 || err?.message?.includes('autorizado') || err?.message?.includes('401') || err?.message?.includes('Token');
+      if (isAuthError) {
+        setSaveError('Sua sessão expirou ou não está autenticada. Por favor, faça login novamente no menu lateral para salvar e orquestrar o sistema da clínica.');
+      } else {
+        setSaveError(err?.message || 'Falha ao comunicar com o servidor para salvar o projeto.');
+      }
     } finally {
       setIsSaving(false);
     }
