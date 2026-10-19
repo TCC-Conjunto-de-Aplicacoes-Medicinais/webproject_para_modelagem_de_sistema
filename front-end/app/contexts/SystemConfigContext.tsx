@@ -341,9 +341,10 @@ export function SystemConfigProvider({ children }: SystemConfigProviderProps) {
       createdAt: now.toISOString(),
       identity: {
         ...state.identity,
-        logoFile: state.identity.logoType === 'custom' 
-          ? (state.identity.logoFile || (typeof window !== 'undefined' ? localStorage.getItem('clinic_custom_logo') : null))
-          : null,
+        logoType: (state.identity.logoFile || (typeof window !== 'undefined' && localStorage.getItem('clinic_custom_logo'))) ? 'custom' : state.identity.logoType,
+        logoFile: state.identity.logoFile 
+          ? state.identity.logoFile 
+          : (typeof window !== 'undefined' ? localStorage.getItem('clinic_custom_logo') : null),
       },
       modules: state.modules,
       technical: state.technical,

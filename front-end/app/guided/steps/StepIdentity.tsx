@@ -47,19 +47,83 @@ export default function StepIdentity() {
 
       const reader = new FileReader();
       reader.onload = () => {
-        const logoData = reader.result as string;
-        if (typeof window !== 'undefined') {
-          try {
-            localStorage.setItem('clinic_custom_logo', logoData);
-          } catch (e) {
-            console.warn('Could not cache logo in localStorage', e);
+        const rawData = reader.result as string;
+
+        // Se for SVG, usa direto
+        if (file.type === 'image/svg+xml' || rawData.startsWith('data:image/svg')) {
+          if (typeof window !== 'undefined') {
+            try {
+              localStorage.setItem('clinic_custom_logo', rawData);
+            } catch (e) {}
           }
+          updateIdentity({
+            logoType: 'custom',
+            logoFile: rawData,
+            logoFileName: file.name,
+          });
+          return;
         }
-        updateIdentity({
-          logoType: 'custom',
-          logoFile: logoData,
-          logoFileName: file.name,
-        });
+
+        // Para PNG/JPEG/WEBP, otimiza dimensões para cabeçalho clínico (máx 320x90px)
+        const img = new Image();
+        img.onload = () => {
+          const maxW = 320;
+          const maxH = 90;
+          let w = img.width;
+          let h = img.height;
+
+          if (w > maxW || h > maxH) {
+            const ratio = Math.min(maxW / w, maxH / h);
+            w = Math.round(w * ratio);
+            h = Math.round(h * ratio);
+          }
+
+          const canvas = document.createElement('canvas');
+          canvas.width = w;
+          canvas.height = h;
+          const ctx = canvas.getContext('2d');
+          if (ctx) {
+            ctx.imageSmoothingEnabled = true;
+            ctx.imageSmoothingQuality = 'high';
+            ctx.drawImage(img, 0, 0, w, h);
+            const optimizedData = canvas.toDataURL('image/png');
+
+            if (typeof window !== 'undefined') {
+              try {
+                localStorage.setItem('clinic_custom_logo', optimizedData);
+              } catch (e) {}
+            }
+            updateIdentity({
+              logoType: 'custom',
+              logoFile: optimizedData,
+              logoFileName: file.name,
+            });
+          } else {
+            if (typeof window !== 'undefined') {
+              try {
+                localStorage.setItem('clinic_custom_logo', rawData);
+              } catch (e) {}
+            }
+            updateIdentity({
+              logoType: 'custom',
+              logoFile: rawData,
+              logoFileName: file.name,
+            });
+          }
+        };
+        img.onerror = () => {
+          if (typeof window !== 'undefined') {
+            try {
+              localStorage.setItem('clinic_custom_logo', rawData);
+            } catch (e) {}
+          }
+          updateIdentity({
+            logoType: 'custom',
+            logoFile: rawData,
+            logoFileName: file.name,
+          });
+        };
+        img.src = rawData;
       };
       reader.readAsDataURL(file);
     },
