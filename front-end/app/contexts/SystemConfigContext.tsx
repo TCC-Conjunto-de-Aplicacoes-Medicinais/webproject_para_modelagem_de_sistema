@@ -291,12 +291,15 @@ export function SystemConfigProvider({ children }: SystemConfigProviderProps) {
   // Load projects from API on mount
   useEffect(() => {
     if (isAuthenticated && token) {
-      loadProjectsFromApi(token).then((projects) => {
-        // Atualmente o back-end retorna só a lista de strings. Se estivéssemos retornando o objeto completo, populariamos o estado
-        if (projects && projects.length > 0) {
-          dispatch({ type: 'LOAD_PROJECTS', projects });
-        }
-      });
+      loadProjectsFromApi(token)
+        .then((projects) => {
+          if (projects && projects.length > 0) {
+            dispatch({ type: 'LOAD_PROJECTS', projects });
+          }
+        })
+        .catch((err) => {
+          console.warn('Erro ao carregar projetos da API:', err?.message || err);
+        });
     } else {
       dispatch({ type: 'LOAD_PROJECTS', projects: [] });
     }

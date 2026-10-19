@@ -40,6 +40,12 @@ export function AuthProvider({ children }: { children: ReactNode }) {
       localStorage.removeItem(TOKEN_KEY);
     }
     setIsLoading(false);
+
+    const handleSessionExpired = () => {
+      logout();
+    };
+    window.addEventListener('openhealth_session_expired', handleSessionExpired);
+    return () => window.removeEventListener('openhealth_session_expired', handleSessionExpired);
   }, []);
 
   // Update storage when verified changes

@@ -11,14 +11,14 @@ export class ApiError extends Error {
 }
 
 let isRefreshing = false;
-let refreshSubscribers: Array<(token: string) => void> = [];
+let refreshSubscribers: Array<(token: string | null, error?: any) => void> = [];
 
-function subscribeTokenRefresh(cb: (token: string) => void) {
+function subscribeTokenRefresh(cb: (token: string | null, error?: any) => void) {
   refreshSubscribers.push(cb);
 }
 
-function onRefreshed(token: string) {
-  refreshSubscribers.forEach((cb) => cb(token));
+function onRefreshed(token: string | null, error?: any) {
+  refreshSubscribers.forEach((cb) => cb(token, error));
   refreshSubscribers = [];
 }
 
@@ -65,17 +65,27 @@ async function fetchWithConfig(endpoint: string, config: RequestInit = {}): Prom
               return fetchWithConfig(endpoint, { ...config, headers: newHeaders });
             } else {
               // Token expirou ou foi revogado no Keycloak
-              localStorage.removeItem('openhealth_token');
-              localStorage.removeItem('openhealth_refresh_token');
+              if (typeof window !== 'undefined') {
+                localStorage.removeItem('openhealth_token');
+                localStorage.removeItem('openhealth_refresh_token');
+                window.dispatchEvent(new Event('openhealth_session_expired'));
+              }
+              isRefreshing = false;
+              onRefreshed(null, new ApiError('Sessão expirada. Faça login novamente.', 401));
             }
-          } catch {
+          } catch (refreshErr) {
             isRefreshing = false;
+            onRefreshed(null, refreshErr);
           }
           isRefreshing = false;
         } else {
           // Wait for the active refresh to finish then retry
           return new Promise((resolve, reject) => {
-            subscribeTokenRefresh((newToken) => {
+            subscribeTokenRefresh((newToken, err) => {
+              if (err || !newToken) {
+                resolve({ projects: [] }); // Soft fallback for query subscribers
+                return;
+              }
               const newHeaders = {
                 ...config.headers,
                 'Content-Type': 'application/json',
@@ -86,6 +96,12 @@ async function fetchWithConfig(endpoint: string, config: RequestInit = {}): Prom
                 .catch(reject);
             });
           });
+        }
+      } else {
+        // Sem refresh token disponível, limpa a sessão
+        if (typeof window !== 'undefined') {
+          localStorage.removeItem('openhealth_token');
+          window.dispatchEvent(new Event('openhealth_session_expired'));
         }
       }
     }
