@@ -21,14 +21,16 @@ type ProjectService struct {
 	clinicRepo     ports.ClinicRepository
 	seedToken      string // vault key component from environment
 	motorURL       string
+	motorToken     string
 }
 
-func NewProjectService(storageService ports.StorageService, clinicRepo ports.ClinicRepository, seedToken string, motorURL string) *ProjectService {
+func NewProjectService(storageService ports.StorageService, clinicRepo ports.ClinicRepository, seedToken string, motorURL string, motorToken string) *ProjectService {
 	return &ProjectService{
 		storageService: storageService,
 		clinicRepo:     clinicRepo,
 		seedToken:      seedToken,
 		motorURL:       motorURL,
+		motorToken:     motorToken,
 	}
 }
 
@@ -83,7 +85,7 @@ func (s *ProjectService) CreateProject(ctx context.Context, tenantID string, inp
 		Payload string `json:"p"`
 	}
 	if err := json.Unmarshal(sealedData, &sealed); err == nil {
-		go func(email, cnpj, clinicName, motorURL string) {
+		go func(email, cnpj, clinicName, motorURL, motorToken string) {
 			if motorURL == "" {
 				log.Println("[ProjectService] Warning: MOTOR_URL is not configured, skipping generation trigger")
 				return
@@ -108,7 +110,10 @@ func (s *ProjectService) CreateProject(ctx context.Context, tenantID string, inp
 			}
 
 			log.Printf("[ProjectService] Triggering system generation via motor at %s...", motorURL)
-			resp, err := http.Post(motorURL+"/generate", "application/json", bytes.NewBuffer(reqBytes))
+			req, _ := http.NewRequest(http.MethodPost, motorURL+"/generate", bytes.NewBuffer(reqBytes))
+			req.Header.Set("Content-Type", "application/json")
+			req.Header.Set("X-Motor-Token", motorToken)
+			resp, err := http.DefaultClient.Do(req)
 			if err != nil {
 				log.Printf("[ProjectService] Error calling motor: %v", err)
 				return
@@ -122,7 +127,7 @@ func (s *ProjectService) CreateProject(ctx context.Context, tenantID string, inp
 			}
 
 			log.Printf("[ProjectService] Successfully triggered motor generation for clinic %s", clinicName)
-		}(clinic.Email, clinic.CNPJ, clinic.ClinicName, s.motorURL)
+		}(clinic.Email, clinic.CNPJ, clinic.ClinicName, s.motorURL, s.motorToken)
 	} else {
 		log.Printf("[ProjectService] Failed to unmarshal sealed object for motor trigger: %v", err)
 	}
@@ -190,7 +195,9 @@ func (s *ProjectService) GetProjectStatus(ctx context.Context, tenantID, project
 	}
 
 	client := &http.Client{Timeout: 3 * time.Second}
-	resp, err := client.Get(fmt.Sprintf("%s/status?clinic_id=%s", motorURL, projectID))
+	statusReq, _ := http.NewRequest(http.MethodGet, fmt.Sprintf("%s/status?clinic_id=%s", motorURL, projectID), nil)
+	statusReq.Header.Set("X-Motor-Token", s.motorToken)
+	resp, err := client.Do(statusReq)
 	if err != nil {
 		return map[string]interface{}{
 			"clinic_id": projectID,

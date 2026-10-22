@@ -10,30 +10,32 @@ import (
 )
 
 type Config struct {
-	Port               string
-	DBHost             string
-	DBPort             string
-	DBUser             string
-	DBPassword         string
-	DBName             string
-	DBCharset          string
-	JWTSecret          string
-	JWTExpirationHours int
-	SMTPHost           string
-	SMTPPort           int
-	SMTPUser           string
-	SMTPPassword       string
-	MinioEndpoint      string
-	MinioAccessKey     string
-	MinioSecretKey     string
-	MinioBucketName    string
-	MinioUseSSL        bool
-	ObjectVaultKey     string
-	KeycloakURL        string
-	KeycloakRealm      string
-	KeycloakClientID   string
+	Port                 string
+	DBHost               string
+	DBPort               string
+	DBUser               string
+	DBPassword           string
+	DBName               string
+	DBCharset            string
+	JWTSecret            string
+	JWTExpirationHours   int
+	SMTPHost             string
+	SMTPPort             int
+	SMTPUser             string
+	SMTPPassword         string
+	MinioEndpoint        string
+	MinioAccessKey       string
+	MinioSecretKey       string
+	MinioBucketName      string
+	MinioUseSSL          bool
+	ObjectVaultKey       string
+	KeycloakURL          string
+	KeycloakRealm        string
+	KeycloakClientID     string
 	KeycloakClientSecret string
-	MotorURL           string
+	MotorURL             string
+	MotorToken           string
+	AdminEmails          string
 }
 
 func LoadConfig() *Config {
@@ -82,30 +84,32 @@ func LoadConfig() *Config {
 	}
 
 	return &Config{
-		Port:               getEnv("PORT", "8080"),
-		DBHost:             getEnv("DB_HOST", "127.0.0.1"),
-		DBPort:             getEnv("DB_PORT", "3306"),
-		DBUser:             getEnv("DB_USER", "root"),
-		DBPassword:         getEnv("DB_PASSWORD", ""),
-		DBName:             getEnv("DB_NAME", "openhealth"),
-		DBCharset:          getEnv("DB_CHARSET", "utf8mb4"),
-		JWTSecret:          getEnv("JWT_SECRET", "super_secret_key_change_me_in_production"),
-		JWTExpirationHours: jwtExp,
-		SMTPHost:           getEnv("SMTP_HOST", "smtp.gmail.com"),
-		SMTPPort:           smtpPort,
-		SMTPUser:           getEnv("SMTP_USER", ""),
-		SMTPPassword:       getEnv("SMTP_PASSWORD", ""),
-		MinioEndpoint:      minioEndpoint,
-		MinioAccessKey:     minioAccessKey,
-		MinioSecretKey:     minioSecretKey,
-		MinioBucketName:    minioBucketName,
-		MinioUseSSL:        minioUseSSL,
-		ObjectVaultKey:     getEnv("OBJ_KEY", ""),
-		KeycloakURL:        getEnv("KEYCLOAK_URL", "http://localhost:8080"),
-		KeycloakRealm:      getEnv("KEYCLOAK_REALM", "openhealth"),
-		KeycloakClientID:   getEnv("KEYCLOAK_CLIENT_ID", "openhealth-api"),
+		Port:                 getEnv("PORT", "8080"),
+		DBHost:               getEnv("DB_HOST", "127.0.0.1"),
+		DBPort:               getEnv("DB_PORT", "3306"),
+		DBUser:               getEnv("DB_USER", "root"),
+		DBPassword:           getEnv("DB_PASSWORD", ""),
+		DBName:               getEnv("DB_NAME", "openhealth"),
+		DBCharset:            getEnv("DB_CHARSET", "utf8mb4"),
+		JWTSecret:            getEnv("JWT_SECRET", "super_secret_key_change_me_in_production"),
+		JWTExpirationHours:   jwtExp,
+		SMTPHost:             getEnv("SMTP_HOST", "smtp.gmail.com"),
+		SMTPPort:             smtpPort,
+		SMTPUser:             getEnv("SMTP_USER", ""),
+		SMTPPassword:         getEnv("SMTP_PASSWORD", ""),
+		MinioEndpoint:        minioEndpoint,
+		MinioAccessKey:       minioAccessKey,
+		MinioSecretKey:       minioSecretKey,
+		MinioBucketName:      minioBucketName,
+		MinioUseSSL:          minioUseSSL,
+		ObjectVaultKey:       getEnv("OBJ_KEY", ""),
+		KeycloakURL:          getEnv("KEYCLOAK_URL", "http://localhost:8080"),
+		KeycloakRealm:        getEnv("KEYCLOAK_REALM", "openhealth"),
+		KeycloakClientID:     getEnv("KEYCLOAK_CLIENT_ID", "openhealth-api"),
 		KeycloakClientSecret: getEnv("KEYCLOAK_CLIENT_SECRET", ""),
-		MotorURL:           getEnv("MOTOR_URL", "http://localhost:8082"),
+		MotorURL:             getEnv("MOTOR_URL", "http://localhost:8082"),
+		MotorToken:           getEnv("MOTOR_TOKEN", ""),
+		AdminEmails:          getEnv("ADMIN_EMAILS", ""),
 	}
 }
 

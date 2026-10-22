@@ -5,6 +5,7 @@ import (
 	"database/sql"
 	"openhealth/internal/core/domain"
 	"openhealth/internal/core/ports"
+	"time"
 
 	"github.com/google/uuid"
 )
@@ -55,7 +56,7 @@ func (r *clinicRepository) Save(ctx context.Context, clinic *domain.Clinic) erro
 		clinic.VerificationCode,
 		clinic.CreatedAt,
 		clinic.UpdatedAt,
-		clinic.DeletedAt,
+		nullableTime(clinic.DeletedAt),
 		clinic.KeycloakID,
 	)
 	return err
@@ -93,21 +94,27 @@ func (r *clinicRepository) UpdateBucketRef(ctx context.Context, id string, bucke
 
 func (r *clinicRepository) scanClinic(row *sql.Row) (*domain.Clinic, error) {
 	var clinic domain.Clinic
+	// Colunas nulas no banco (deleted_at, updated_at, textos opcionais) são lidas
+	// via tipos Null* para não falhar com "unsupported Scan, storing driver.Value type <nil>".
+	var (
+		location, specialty, phone, bucketObj, verificationCode sql.NullString
+		updatedAt, deletedAt                                    sql.NullTime
+	)
 	err := row.Scan(
 		&clinic.ID,
 		&clinic.CNPJ,
 		&clinic.Email,
 		&clinic.ResponsibleName,
 		&clinic.ClinicName,
-		&clinic.Location,
-		&clinic.Specialty,
-		&clinic.Phone,
-		&clinic.BucketObj,
+		&location,
+		&specialty,
+		&phone,
+		&bucketObj,
 		&clinic.Verify,
-		&clinic.VerificationCode,
+		&verificationCode,
 		&clinic.CreatedAt,
-		&clinic.UpdatedAt,
-		&clinic.DeletedAt,
+		&updatedAt,
+		&deletedAt,
 		&clinic.KeycloakID,
 	)
 	if err == sql.ErrNoRows {
@@ -116,6 +123,21 @@ func (r *clinicRepository) scanClinic(row *sql.Row) (*domain.Clinic, error) {
 	if err != nil {
 		return nil, err
 	}
+	clinic.Location = location.String
+	clinic.Specialty = specialty.String
+	clinic.Phone = phone.String
+	clinic.BucketObj = bucketObj.String
+	clinic.VerificationCode = verificationCode.String
+	clinic.UpdatedAt = updatedAt.Time
+	clinic.DeletedAt = deletedAt.Time
 	return &clinic, nil
 }
 
+// nullableTime grava NULL quando o instante é zero (registro não excluído),
+// evitando inserir datas inválidas em colunas timestamp.
+func nullableTime(t time.Time) interface{} {
+	if t.IsZero() {
+		return nil
+	}
+	return t
+}

@@ -63,7 +63,7 @@ func main() {
 		kcAuth,
 		appLogger,
 	)
-	projectService := services.NewProjectService(minioService, clinicRepo, cfg.ObjectVaultKey, cfg.MotorURL)
+	projectService := services.NewProjectService(minioService, clinicRepo, cfg.ObjectVaultKey, cfg.MotorURL, cfg.MotorToken)
 
 	// 7. Initialize HTTP Handlers
 	authHandler := httpHandlers.NewAuthHandler(authService, appLogger)
@@ -108,6 +108,15 @@ func main() {
 			projects.GET("", projectHandler.ListProjects)
 			projects.GET("/:id/status", projectHandler.GetProjectStatus)
 			projects.DELETE("/:id", projectHandler.DeleteProject)
+		}
+
+		// Painel de administração: só e-mails em ADMIN_EMAILS; o motor é acessado pelo servidor.
+		adminHandler := httpHandlers.NewAdminHandler(authService, strings.Split(cfg.AdminEmails, ","), cfg.MotorURL, cfg.MotorToken)
+		admin := api.Group("/admin")
+		admin.Use(adminHandler.Middleware())
+		{
+			admin.GET("/clinics", adminHandler.ListClinics)
+			admin.POST("/clinics/:id/destroy", adminHandler.DestroyClinic)
 		}
 	}
 
