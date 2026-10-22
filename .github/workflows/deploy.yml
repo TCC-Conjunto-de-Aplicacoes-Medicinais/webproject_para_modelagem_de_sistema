@@ -141,6 +141,9 @@ jobs:
               -e MINIO_BUCKET_NAME="${{ secrets.MINIO_BUCKET_NAME }}" \
               -e MINIO_USE_SSL="false" \
               -e OBJ_KEY="${{ secrets.OBJ_KEY }}" \
+              -e MOTOR_URL="${{ secrets.MOTOR_URL }}" \
+              -e MOTOR_TOKEN="${{ secrets.MOTOR_TOKEN }}" \
+              -e ADMIN_EMAILS="${{ secrets.ADMIN_EMAILS }}" \
               -e GIN_MODE="release" \
               --memory=256m \
               ${{ secrets.DOCKERHUB_USERNAME }}/openhealth-web:latest
