@@ -36,6 +36,8 @@ type Config struct {
 	MotorURL             string
 	MotorToken           string
 	AdminEmails          string
+	// LocalGenerationEnabled libera o modo local (sem AWS). Só o notebook do administrador liga; em produção fica false.
+	LocalGenerationEnabled bool
 }
 
 func LoadConfig() *Config {
@@ -110,6 +112,7 @@ func LoadConfig() *Config {
 		MotorURL:             getEnv("MOTOR_URL", "http://localhost:8082"),
 		MotorToken:           getEnv("MOTOR_TOKEN", ""),
 		AdminEmails:          getEnv("ADMIN_EMAILS", ""),
+		LocalGenerationEnabled: getEnv("LOCAL_GENERATION_ENABLED", "false") == "true",
 	}
 }
 

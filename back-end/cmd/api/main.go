@@ -67,7 +67,7 @@ func main() {
 
 	// 7. Initialize HTTP Handlers
 	authHandler := httpHandlers.NewAuthHandler(authService, appLogger)
-	projectHandler := httpHandlers.NewProjectHandler(projectService)
+	projectHandler := httpHandlers.NewProjectHandler(projectService, cfg.LocalGenerationEnabled)
 
 	// 8. Setup Gin Router
 	r := gin.Default()
@@ -84,6 +84,11 @@ func main() {
 	// 9. Setup API Routes
 	api := r.Group("/api/v1")
 	{
+		// Capacidades públicas: o front usa para travar o modo local em produção.
+		api.GET("/system/capabilities", func(c *gin.Context) {
+			c.JSON(http.StatusOK, gin.H{"localGenerationEnabled": cfg.LocalGenerationEnabled})
+		})
+
 		// Health Check (usado pelo Docker HEALTHCHECK)
 		api.GET("/health", func(c *gin.Context) {
 			c.JSON(http.StatusOK, gin.H{"status": "ok"})
@@ -117,6 +122,7 @@ func main() {
 		{
 			admin.GET("/clinics", adminHandler.ListClinics)
 			admin.POST("/clinics/:id/destroy", adminHandler.DestroyClinic)
+			admin.GET("/status", adminHandler.Status)
 		}
 	}
 

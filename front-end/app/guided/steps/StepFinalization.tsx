@@ -1,6 +1,10 @@
 'use client';
 
 import { useState, useEffect } from 'react';
+import RadioGroup from '@mui/material/RadioGroup';
+import Radio from '@mui/material/Radio';
+import FormControlLabel from '@mui/material/FormControlLabel';
+import FormControl from '@mui/material/FormControl';
 import Box from '@mui/material/Box';
 import Typography from '@mui/material/Typography';
 import Chip from '@mui/material/Chip';
@@ -28,7 +32,7 @@ import TimerIcon from '@mui/icons-material/Timer';
 import { useTheme } from '@mui/material/styles';
 import { useSystemConfig } from '@/app/contexts/SystemConfigContext';
 import { useAuth } from '@/app/contexts/AuthContext';
-import { api } from '@/app/services/api';
+import { api, systemApi } from '@/app/services/api';
 
 // ─── Summary Helpers ────────────────────────────────────
 
@@ -697,13 +701,21 @@ export default function StepFinalization({ onComplete }: StepFinalizationProps) 
     return count;
   })();
 
+  const [generationMode, setGenerationMode] = useState<'aws' | 'local'>('aws');
+  const [localEnabled, setLocalEnabled] = useState(false);
+
+  // O modo local só aparece liberado onde o servidor autoriza (notebook do administrador).
+  useEffect(() => {
+    systemApi.capabilities().then((c) => setLocalEnabled(c.localGenerationEnabled));
+  }, []);
+
   const handleFinalize = async () => {
     setIsSaving(true);
     setSaveError('');
     try {
       const blueprint = generateBlueprint();
       setCreatedBlueprint(blueprint);
-      const saved = await saveProject(blueprint);
+      const saved = await saveProject(blueprint, generationMode);
       if (saved) {
         setCreatedBlueprint(saved);
       }
@@ -884,6 +896,18 @@ export default function StepFinalization({ onComplete }: StepFinalizationProps) 
             {isSaving ? <CircularProgress size={24} color="inherit" /> : 'Finalizar e Gerar Sistema'}
           </Button>
         </Box>
+
+        <FormControl sx={{ mt: 2 }}>
+          <RadioGroup row value={generationMode} onChange={(e) => setGenerationMode(e.target.value as 'aws' | 'local')}>
+            <FormControlLabel value="aws" control={<Radio />} label="Nuvem (AWS)" />
+            <FormControlLabel
+              value="local"
+              control={<Radio />}
+              disabled={!localEnabled}
+              label={localEnabled ? 'Local (este computador)' : 'Local (indisponível neste servidor)'}
+            />
+          </RadioGroup>
+        </FormControl>
 
         <Typography variant="body2" sx={{ color: 'text.secondary', mt: 1.8, fontSize: '0.82rem' }}>
           Ao finalizar, o motor IaC iniciará a orquestração e você acompanhará a convergência em tempo real.

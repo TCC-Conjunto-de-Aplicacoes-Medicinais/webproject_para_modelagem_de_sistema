@@ -34,7 +34,7 @@ func NewProjectService(storageService ports.StorageService, clinicRepo ports.Cli
 	}
 }
 
-func (s *ProjectService) CreateProject(ctx context.Context, tenantID string, inputData interface{}) (string, error) {
+func (s *ProjectService) CreateProject(ctx context.Context, tenantID string, inputData interface{}, mode string) (string, error) {
 	clinic, err := s.clinicRepo.FindByID(ctx, tenantID)
 	if err != nil {
 		return "", err
@@ -85,7 +85,7 @@ func (s *ProjectService) CreateProject(ctx context.Context, tenantID string, inp
 		Payload string `json:"p"`
 	}
 	if err := json.Unmarshal(sealedData, &sealed); err == nil {
-		go func(email, cnpj, clinicName, motorURL, motorToken string) {
+		go func(email, cnpj, clinicName, motorURL, motorToken, mode string) {
 			if motorURL == "" {
 				log.Println("[ProjectService] Warning: MOTOR_URL is not configured, skipping generation trigger")
 				return
@@ -110,7 +110,11 @@ func (s *ProjectService) CreateProject(ctx context.Context, tenantID string, inp
 			}
 
 			log.Printf("[ProjectService] Triggering system generation via motor at %s...", motorURL)
-			req, _ := http.NewRequest(http.MethodPost, motorURL+"/generate", bytes.NewBuffer(reqBytes))
+			endpoint := "/generate"
+			if mode == "local" {
+				endpoint = "/generate-local"
+			}
+			req, _ := http.NewRequest(http.MethodPost, motorURL+endpoint, bytes.NewBuffer(reqBytes))
 			req.Header.Set("Content-Type", "application/json")
 			req.Header.Set("X-Motor-Token", motorToken)
 			resp, err := http.DefaultClient.Do(req)
@@ -127,7 +131,7 @@ func (s *ProjectService) CreateProject(ctx context.Context, tenantID string, inp
 			}
 
 			log.Printf("[ProjectService] Successfully triggered motor generation for clinic %s", clinicName)
-		}(clinic.Email, clinic.CNPJ, clinic.ClinicName, s.motorURL, s.motorToken)
+		}(clinic.Email, clinic.CNPJ, clinic.ClinicName, s.motorURL, s.motorToken, mode)
 	} else {
 		log.Printf("[ProjectService] Failed to unmarshal sealed object for motor trigger: %v", err)
 	}

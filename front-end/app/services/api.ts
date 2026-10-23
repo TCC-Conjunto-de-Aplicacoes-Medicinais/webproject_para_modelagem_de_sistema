@@ -168,8 +168,8 @@ export const api = {
   },
 
   // --- Projects ---
-  createProject: async (token: string, data: any) => {
-    return fetchWithConfig('/projects', {
+  createProject: async (token: string, data: any, mode: 'aws' | 'local' = 'aws') => {
+    return fetchWithConfig(`/projects?mode=${mode}`, {
       method: 'POST',
       headers: {
         Authorization: `Bearer ${token}`,
@@ -204,4 +204,28 @@ export const api = {
       },
     });
   },
+};
+
+// --- Sistema e painel de administração ---
+export const systemApi = {
+  // Público: diz se o servidor libera a geração local (só o notebook do administrador).
+  capabilities: async (): Promise<{ localGenerationEnabled: boolean }> => {
+    try {
+      return await fetchWithConfig('/system/capabilities', { method: 'GET' });
+    } catch {
+      return { localGenerationEnabled: false };
+    }
+  },
+
+  adminStatus: async (token: string) =>
+    fetchWithConfig('/admin/status', { method: 'GET', headers: { Authorization: `Bearer ${token}` } }),
+
+  adminClinics: async (token: string) =>
+    fetchWithConfig('/admin/clinics', { method: 'GET', headers: { Authorization: `Bearer ${token}` } }),
+
+  destroyClinic: async (token: string, id: string) =>
+    fetchWithConfig(`/admin/clinics/${encodeURIComponent(id)}/destroy`, {
+      method: 'POST',
+      headers: { Authorization: `Bearer ${token}` },
+    }),
 };

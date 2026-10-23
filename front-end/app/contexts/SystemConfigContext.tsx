@@ -127,9 +127,9 @@ async function loadProjectsFromApi(token: string): Promise<SystemBlueprint[]> {
   }
 }
 
-async function saveProjectToApi(token: string, project: SystemBlueprint) {
+async function saveProjectToApi(token: string, project: SystemBlueprint, mode: 'aws' | 'local' = 'aws') {
   try {
-    await api.createProject(token, project);
+    await api.createProject(token, project, mode);
   } catch (err) {
     console.error('Falha ao salvar projeto na API', err);
     throw err;
@@ -266,7 +266,7 @@ interface SystemConfigContextType {
   updateImplementation: (payload: Partial<ImplementationConfig>) => void;
   reset: () => void;
   generateBlueprint: () => SystemBlueprint;
-  saveProject: (customBlueprint?: SystemBlueprint) => Promise<SystemBlueprint>;
+  saveProject: (customBlueprint?: SystemBlueprint, mode?: 'aws' | 'local') => Promise<SystemBlueprint>;
   deleteProject: (id: string) => Promise<void>;
   goNext: () => void;
   goBack: () => void;
@@ -355,10 +355,10 @@ export function SystemConfigProvider({ children }: SystemConfigProviderProps) {
     };
   }, [state]);
 
-  const saveProject = useCallback(async (customBlueprint?: SystemBlueprint): Promise<SystemBlueprint> => {
+  const saveProject = useCallback(async (customBlueprint?: SystemBlueprint, mode: 'aws' | 'local' = 'aws'): Promise<SystemBlueprint> => {
     if (!token) throw new Error('Não autorizado');
     const blueprint = customBlueprint || generateBlueprint();
-    await saveProjectToApi(token, blueprint);
+    await saveProjectToApi(token, blueprint, mode);
     dispatch({ type: 'SAVE_PROJECT', project: blueprint });
     return blueprint;
   }, [generateBlueprint, token]);

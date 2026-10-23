@@ -9,11 +9,13 @@ import (
 
 type ProjectHandler struct {
 	projectService *services.ProjectService
+	localEnabled   bool
 }
 
-func NewProjectHandler(projectService *services.ProjectService) *ProjectHandler {
+func NewProjectHandler(projectService *services.ProjectService, localEnabled bool) *ProjectHandler {
 	return &ProjectHandler{
 		projectService: projectService,
+		localEnabled:   localEnabled,
 	}
 }
 
@@ -24,13 +26,23 @@ func (h *ProjectHandler) CreateProject(c *gin.Context) {
 		return
 	}
 
+	// Modo de geração: "aws" (padrão) ou "local". O local só vale onde o servidor liberou (notebook).
+	mode := "aws"
+	if c.Query("mode") == "local" {
+		if !h.localEnabled {
+			c.JSON(http.StatusForbidden, gin.H{"error": "geração local desabilitada neste servidor"})
+			return
+		}
+		mode = "local"
+	}
+
 	var req interface{}
 	if err := c.ShouldBindJSON(&req); err != nil {
 		c.JSON(http.StatusBadRequest, gin.H{"error": "Invalid request payload"})
 		return
 	}
 
-	projectID, err := h.projectService.CreateProject(c.Request.Context(), tenantID.(string), req)
+	projectID, err := h.projectService.CreateProject(c.Request.Context(), tenantID.(string), req, mode)
 	if err != nil {
 		c.JSON(http.StatusInternalServerError, gin.H{"error": err.Error()})
 		return

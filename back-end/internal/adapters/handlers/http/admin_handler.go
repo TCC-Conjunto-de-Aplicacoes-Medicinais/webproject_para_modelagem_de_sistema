@@ -1,8 +1,10 @@
 package http
 
 import (
+	"encoding/json"
 	"io"
 	"net/http"
+	"runtime"
 	"openhealth/internal/core/ports"
 	"strings"
 	"time"
@@ -58,6 +60,43 @@ func (h *AdminHandler) Middleware() gin.HandlerFunc {
 		}
 		c.Next()
 	}
+}
+
+var startedAt = time.Now()
+
+// Status GET /api/v1/admin/status — números para o painel: estado do motor, clínicas por status e do próprio serviço.
+func (h *AdminHandler) Status(c *gin.Context) {
+	motorOK := false
+	counts := map[string]int{}
+	total := 0
+	if h.motorURL != "" {
+		req, _ := http.NewRequestWithContext(c.Request.Context(), http.MethodGet, h.motorURL+"/clinics", nil)
+		req.Header.Set("X-Motor-Token", h.motorToken)
+		if resp, err := h.client.Do(req); err == nil {
+			defer resp.Body.Close()
+			var list []struct {
+				Status string `json:"status"`
+			}
+			if resp.StatusCode == http.StatusOK && json.NewDecoder(resp.Body).Decode(&list) == nil {
+				motorOK = true
+				for _, cl := range list {
+					counts[cl.Status]++
+					total++
+				}
+			}
+		}
+	}
+	var mem runtime.MemStats
+	runtime.ReadMemStats(&mem)
+	c.JSON(http.StatusOK, gin.H{
+		"motor_online":      motorOK,
+		"clinics_total":     total,
+		"clinics_by_status": counts,
+		"wizard_uptime_s":   int(time.Since(startedAt).Seconds()),
+		"wizard_heap_mb":    mem.HeapAlloc / 1024 / 1024,
+		"wizard_goroutines": runtime.NumGoroutine(),
+		"generated_at":      time.Now().Format(time.RFC3339),
+	})
 }
 
 // ListClinics GET /api/v1/admin/clinics
