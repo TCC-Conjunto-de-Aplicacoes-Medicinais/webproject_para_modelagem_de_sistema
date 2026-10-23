@@ -1,6 +1,7 @@
 'use client';
 
-import { useEffect, useMemo, useCallback } from 'react';
+import { useEffect, useMemo, useCallback, useState } from 'react';
+import { systemApi } from '@/app/services/api';
 import TextField from '@mui/material/TextField';
 import InputAdornment from '@mui/material/InputAdornment';
 import Box from '@mui/material/Box';
@@ -166,8 +167,17 @@ function OptionCard({ selected, onClick, icon, title, description, badge, accent
 // ─── Main Component ─────────────────────────────────────
 
 export default function StepTechnical() {
+
   const { state, updateTechnical } = useSystemConfig();
   const { technical, modules } = state;
+  const [localEnabled, setLocalEnabled] = useState(false);
+  useEffect(() => {
+    systemApi.capabilities().then((c) => setLocalEnabled(c.localGenerationEnabled));
+  }, []);
+  // Um rascunho salvo com "local" volta para AWS quando o servidor não libera o modo local.
+  useEffect(() => {
+    if (!localEnabled && technical.environment === 'local') updateTechnical({ environment: 'aws' });
+  }, [localEnabled, technical.environment, updateTechnical]);
   const theme = useTheme();
   const isDark = theme.palette.mode === 'dark';
   const accentColor = '#00C853';
@@ -330,17 +340,19 @@ export default function StepTechnical() {
             />
           </Box>
 
-          {/* Local */}
-          <Box sx={{ flex: 1 }}>
+          {/* Local: só aparece liberado no servidor do administrador (ver capabilities) */}
+          <Tooltip title={localEnabled ? '' : 'Disponível apenas no servidor do administrador'}>
+          <Box sx={{ flex: 1, opacity: localEnabled ? 1 : 0.45, cursor: localEnabled ? 'pointer' : 'not-allowed' }}>
             <OptionCard
               selected={technical.environment === 'local'}
-              onClick={() => updateTechnical({ environment: 'local' })}
+              onClick={() => { if (localEnabled) updateTechnical({ environment: 'local' }); }}
               icon={<DnsIcon sx={{ fontSize: 32 }} />}
               title="Servidor Local"
               description="O sistema roda em máquinas da própria clínica. Sem custo de nuvem mensal."
               accentColor={accentColor}
             />
           </Box>
+          </Tooltip>
         </Box>
 
         {/* Local Warning */}
